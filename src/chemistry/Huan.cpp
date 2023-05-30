@@ -34,7 +34,7 @@ namespace {
   int nsub_max; //maximum number of substeps
   Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
                    const Real E, const Real Edot);
-  void IntegrateOneSubstep(Real tsub, Real y[NSPECIES], const Real ydot[NSPECIES],
+  void IntegrateHalfSubstep(Real tsub, Real y[NSPECIES], const Real ydot[NSPECIES],
                            Real &E, const Real Edot);
   void IntegrateFullSubstep(Real tsub, 
                              Real y[NSPECIES], const Real ydot0[NSPECIES], const Real ydot1[NSPECIES],
@@ -109,7 +109,7 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
       for (int i=is; i<=ie; ++i) {
         pmy_spec_->chemnet.InitializeNextStep(k, j, i);
         //copy species abundance
-        for (int ispec=0; ispec<NSPECIES; ispec++) {
+        for (int ispec=0; ispec<=NSPECIES; ispec++) {
           y[ispec] = pmy_spec_->s(ispec,k,j,i)/u(IDN,k,j,i);
         }
         //assign internal energy, if not isothermal eos
@@ -136,14 +136,14 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
           if (NON_BAROTROPIC_EOS) {
             Edot0 = pmy_spec_->chemnet.Edot(time, y, E);
           }
-          // get the sub-cycle dt 
+          //get the sub-cycle dt 
           tsub = cfl_cool_sub * GetChemTime(y, ydot0, E, Edot0);
           tsub = std::min(tsub, tleft);
           
           //advance half step
-          IntegrateOneSubstep(tsub, y1, ydot0, E1, Edot0);
+          IntegrateHalfSubstep(tsub, y1, ydot0, E1, Edot0);
 
-          // Full step calcuation
+          //Full step calcuation
           //calculate reaction rates
           pmy_spec_->chemnet.RHS(time, y1, E1, ydot1);
           //calculate heating and cooling rats
@@ -163,7 +163,8 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
           if (icount > nsub_max) {
             std::stringstream msg;
             msg << "### FATAL ERROR in function ODEWrapper::Integrate: "
-              << "Maximum number of substeps = " << nsub_max
+              << "Maximum number of substeps = " << nsub_max 
+              << ", tnow = "  << tnow << ", tleft = "  << tleft << ", tsub = " << tsub
               << " exceeded for Huan solver." << std::endl;
             ATHENA_ERROR(msg);
           }
@@ -212,7 +213,7 @@ Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
   const Real small_ = 1024 * std::numeric_limits<float>::min();
   //put floor in species abundance
   Real yf[NSPECIES];
-  for (int ispec=0; ispec<NSPECIES; ispec++) {
+  for (int ispec=0; ispec<=NSPECIES; ispec++) {
     yf[ispec] = std::max(y[ispec], yfloor);
   }
   //calculate chemistry timescale
