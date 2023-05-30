@@ -110,7 +110,7 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
         pmy_spec_->chemnet.InitializeNextStep(k, j, i);
         //copy species abundance
         for (int ispec=0; ispec<=NSPECIES; ispec++) {
-          y[ispec] = pmy_spec_->s(ispec,k,j,i)/u(IDN,k,j,i);
+          y[ispec] = y1[ispec] = pmy_spec_->s(ispec,k,j,i)/u(IDN,k,j,i);
         }
         //assign internal energy, if not isothermal eos
         if (NON_BAROTROPIC_EOS) {
@@ -121,6 +121,7 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
             E -= 0.5*(
                 SQR(bcc(IB1,k,j,i)) + SQR(bcc(IB2,k,j,i)) + SQR(bcc(IB3,k,j,i)) );
           }
+          E1 = E;
         }
         //subcycling
         icount = 0;
