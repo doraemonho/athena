@@ -202,7 +202,7 @@ parser.add_argument('--fftw_path',
 # --chemistry argument
 parser.add_argument('--chemistry',
                     default=None,
-                    choices=["gow17", "H2", "kida", "G14Sod"],
+                    choices=["gow17", "H2", "kida", "G14Sod","SimpleMultiPhase"],
                     help='select chemical network')
 
 # --kida_rates argument
@@ -220,7 +220,7 @@ parser.add_argument('--chem_radiation',
 # --ode_solver argument
 parser.add_argument('--ode_solver',
                     default=None,
-                    choices=["cvode", "forward_euler"],
+                    choices=["cvode", "forward_euler","Huan"],
                     help='ode solver for chemistry')
 
 # --cvode_path argument
