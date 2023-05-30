@@ -190,7 +190,7 @@ Real CoolingTimeStep(MeshBlock *pmb){
         Real Cooling = 2e-26*nH_*(1e7*exp(-1.184e5/(T+ 1e3)) + 1.4e-2*sqrt(T)*exp(-92/T));
         Real dEdt    = Heating;
 
-        if (T > 50) {
+        if (T > 20) {
           dEdt = dEdt - Cooling;
         }
         Real cool_dt = std::abs(0.15*E_ergs/dEdt/unit_time_in_s_);

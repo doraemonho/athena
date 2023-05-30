@@ -188,7 +188,7 @@ Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
   const Real small_ = 1024 * std::numeric_limits<float>::min();
   //put floor in species abundance
   Real yf[NSPECIES];
-  for (int ispec=0; ispec<NSPECIES; ispec++) {
+  for (int ispec=0; ispec<=NSPECIES; ispec++) {
     yf[ispec] = std::max(y[ispec], yfloor);
   }
   //calculate chemistry timescale
@@ -208,7 +208,7 @@ Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
 //! \brief advance chemical abundance and energy for tsub
 void IntegrateOneSubstep(Real tsub, Real y[NSPECIES], const Real ydot[NSPECIES],
                          Real &E, const Real Edot) {
-  for (int ispec=0; ispec<NSPECIES; ispec++) {
+  for (int ispec=0; ispec<=NSPECIES; ispec++) {
     y[ispec] += ydot[ispec] * tsub;
   }
   if (NON_BAROTROPIC_EOS) {

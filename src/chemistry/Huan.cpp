@@ -170,7 +170,7 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
           }
         }
         //copy species abundance back to s
-        for (int ispec=0; ispec<NSPECIES; ispec++) {
+        for (int ispec=0; ispec<=NSPECIES; ispec++) {
           //apply floor to passive scalar concentrations
           y[ispec] = (y[ispec] < scalar_floor) ?  scalar_floor : y[ispec];
           pmy_spec_->s(ispec,k,j,i) = y[ispec]*u(IDN,k,j,i);
