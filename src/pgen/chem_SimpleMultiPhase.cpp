@@ -193,7 +193,7 @@ Real CoolingTimeStep(MeshBlock *pmb){
         if (T > 50) {
           dEdt = dEdt - Cooling;
         }
-        Real cool_dt = std::abs(0.3*E_ergs/dEdt/unit_time_in_s_);
+        Real cool_dt = std::abs(0.15*E_ergs/dEdt/unit_time_in_s_);
         
         if (min_dt > cool_dt){
           min_dt   = cool_dt;
