@@ -68,6 +68,7 @@ void SixRayBoundaryInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &
 void SixRayBoundaryOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
                            FaceField &b, Real time, Real dt,
                            int il, int iu, int jl, int ju, int kl, int ku, int ngh);
+Real CoolingTimeStep(MeshBlock *pmb);
 
 //Radiation boundary
 namespace {
@@ -455,48 +456,37 @@ void SixRayBoundaryOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &
   return;
 }
 
-void MeshBlock::UserWorkInLoop() {
+Real CoolingTimeStep(MeshBlock *pmb){
   const Real unit_length_in_cm_  = 3.086e+18;
   const Real unit_vel_in_cms_    = 1.0e5;
   const Real unit_density_in_nH_ = 1;
   const Real unit_E_in_cgs_ = 1.67e-24 * 1.4 * unit_density_in_nH_
                            * unit_vel_in_cms_ * unit_vel_in_cms_;
   const Real unit_time_in_s_ = unit_length_in_cm_/unit_vel_in_cms_;
-  const Real  g =  peos->GetGamma();
-  const Real Tfloor = 10.0;
-  //set density and pressure floors
-  for (int k=ks; k<=ke; k++) {
-    for (int j=js; j<=je; j++) {
-      for (int i=is; i<=ie; i++) {
-          Real& u_d  = phydro->u(IDN,k,j,i);
-          Real& w_p  = phydro->w(IPR,k,j,i);
-          Real& u_e  = phydro->u(IEN,k,j,i);
-          Real& u_m1 = phydro->u(IM1,k,j,i);
-          Real& u_m2 = phydro->u(IM2,k,j,i);
-          Real& u_m3 = phydro->u(IM3,k,j,i);
-          
-          Real   nH_  = u_d*unit_density_in_nH_;
-          Real   ED   = w_p/(g-1.0);
-          Real E_ergs = ED * unit_E_in_cgs_ / nH_;
-          Real     T  =  E_ergs / (1.5*1.381e-16);
+  const Real  g = 5.0/3.0;
+  Real min_dt = 0.3*pmb->pcoord->dx1f(0)/std::abs(pmb->phydro->u(IVX,pmb->ke,pmb->je,pmb->ie));
+  for (int k=pmb->ks; k<=pmb->ke; ++k) {
+    for (int j=pmb->js; j<=pmb->je; ++j) {
+      for (int i=pmb->is; i<=pmb->ie; ++i) {
+        Real   nH_  = pmb->phydro->u(IDN,k,j,i)*unit_density_in_nH_;
+        Real   ED   = pmb->phydro->w(IPR,k,j,i)/(g-1.0);
+        Real E_ergs = ED * unit_E_in_cgs_ / nH_;
+        Real     T  =  E_ergs / (1.5*1.381e-16);
+        Real Heating = 2e-26;
+        Real Cooling = 2e-26*nH_*(1e7*exp(-1.184e5/(T+ 1e3)) + 1.4e-2*sqrt(T)*exp(-92/T));
+        Real dEdt    = Heating;
 
-          Real pfloor = Tfloor* (1.5*1.381e-16) * nH_/unit_E_in_cgs_*(g - 1.0);
-          w_p = (T > Tfloor) ?  w_p : pfloor;
-          Real di = 1.0/u_d;
-          Real ke = 0.5*di*(SQR(u_m1) + SQR(u_m2) + SQR(u_m3));
-
-            
-#if !MAGNETIC_FIELDS_ENABLED  // Hydro:
-          u_e = w_p/(g-1.0)+ke;
-#else  // MHD:
-          Real me =0.5*0.25*(SQR(pfield->b.x1f(k,j,i) + pfield->b.x1f(k,j,i+1))
-                           + SQR(pfield->b.x2f(k,j,i) + pfield->b.x2f(k,j+1,i))
-                           + SQR(pfield->b.x3f(k,j,i) + pfield->b.x3f(k+1,j,i)));
-         u_e = w_p/(g-1.0)+ke+me;
-#endif
-          
+        if (T > 20) {
+          dEdt = dEdt - Cooling;
+        }
+        Real cool_dt = std::abs(0.3*E_ergs/dEdt/unit_time_in_s_);
+        
+        if (min_dt > cool_dt){
+          min_dt   = cool_dt;
+        }
       }
     }
   }
-  return;
+  //std::cout<<"finishing Timestep"<<std::endl;
+  return min_dt;
 }
