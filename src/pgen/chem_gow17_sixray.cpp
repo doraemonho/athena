@@ -92,6 +92,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     throw std::runtime_error(msg.str().c_str());
     return;
 #endif
+  EnrollUserTimeStepFunction(CoolingTimeStep);
 }
 
   //EnrollUserBoundaryFunction(BoundaryFace::inner_x1, SixRayBoundaryInnerX1);
@@ -448,6 +449,52 @@ void SixRayBoundaryOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &
         for (int i=il; i<=iu; ++i) {
           prim(n,ku+k,j,i) = 0;
         }
+      }
+    }
+  }
+  return;
+}
+
+void MeshBlock::UserWorkInLoop() {
+  const Real unit_length_in_cm_  = 3.086e+18;
+  const Real unit_vel_in_cms_    = 1.0e5;
+  const Real unit_density_in_nH_ = 1;
+  const Real unit_E_in_cgs_ = 1.67e-24 * 1.4 * unit_density_in_nH_
+                           * unit_vel_in_cms_ * unit_vel_in_cms_;
+  const Real unit_time_in_s_ = unit_length_in_cm_/unit_vel_in_cms_;
+  const Real  g =  peos->GetGamma();
+  const Real Tfloor = 10.0;
+  //set density and pressure floors
+  for (int k=ks; k<=ke; k++) {
+    for (int j=js; j<=je; j++) {
+      for (int i=is; i<=ie; i++) {
+          Real& u_d  = phydro->u(IDN,k,j,i);
+          Real& w_p  = phydro->w(IPR,k,j,i);
+          Real& u_e  = phydro->u(IEN,k,j,i);
+          Real& u_m1 = phydro->u(IM1,k,j,i);
+          Real& u_m2 = phydro->u(IM2,k,j,i);
+          Real& u_m3 = phydro->u(IM3,k,j,i);
+          
+          Real   nH_  = u_d*unit_density_in_nH_;
+          Real   ED   = w_p/(g-1.0);
+          Real E_ergs = ED * unit_E_in_cgs_ / nH_;
+          Real     T  =  E_ergs / (1.5*1.381e-16);
+
+          Real pfloor = Tfloor* (1.5*1.381e-16) * nH_/unit_E_in_cgs_*(g - 1.0);
+          w_p = (T > Tfloor) ?  w_p : pfloor;
+          Real di = 1.0/u_d;
+          Real ke = 0.5*di*(SQR(u_m1) + SQR(u_m2) + SQR(u_m3));
+
+            
+#if !MAGNETIC_FIELDS_ENABLED  // Hydro:
+          u_e = w_p/(g-1.0)+ke;
+#else  // MHD:
+          Real me =0.5*0.25*(SQR(pfield->b.x1f(k,j,i) + pfield->b.x1f(k,j,i+1))
+                           + SQR(pfield->b.x2f(k,j,i) + pfield->b.x2f(k,j+1,i))
+                           + SQR(pfield->b.x3f(k,j,i) + pfield->b.x3f(k+1,j,i)));
+         u_e = w_p/(g-1.0)+ke+me;
+#endif
+          
       }
     }
   }
