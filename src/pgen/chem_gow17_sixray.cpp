@@ -461,6 +461,9 @@ void SixRayBoundaryOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &
 }
 
 Real CoolingTimeStep(MeshBlock *pmb){
+
+  AthenaArray<Real> &u = pmb->phydro->u;
+  const Real yfloor = 1e-3;
   const Real unit_length_in_cm_  = 3.086e+18;
   const Real unit_vel_in_cms_    = 1.0e5;
   const Real unit_density_in_nH_ = 1;
@@ -473,10 +476,11 @@ Real CoolingTimeStep(MeshBlock *pmb){
   Real Edot = 0;
   Real    y[NSPECIES];
   Real ydot[NSPECIES];
-
-  pmy_spec_ = pmb->pscalars;
+  
   Real min_dt = pmb->pmy_mesh->dt; //MHD timestep
   Real time = pmb->pmy_mesh->time;//code time
+  Real tsub = 0.0;
+
 
   for (int k=pmb->ks; k<=pmb->ke; ++k) {
     for (int j=pmb->js; j<=pmb->je; ++j) {
@@ -484,16 +488,16 @@ Real CoolingTimeStep(MeshBlock *pmb){
 
         E = pmb->phydro->w(IPR,k,j,i)/(g-1.0);
 
-        pmy_spec_->chemnet.InitializeNextStep(k, j, i);
+        pmb->pscalars->chemnet.InitializeNextStep(k, j, i);
         //copy species abundance
         for (int ispec=0; ispec<=NSPECIES; ispec++) {
-          y[ispec] = pmy_spec_->s(ispec,k,j,i)/u(IDN,k,j,i);
+          y[ispec] = pmb->pscalars->s(ispec,k,j,i)/u(IDN,k,j,i);
         }
         //calculate reaction rates
-        pmy_spec_->chemnet.RHS(time, y, E, ydot);
+        pmb->pscalars->chemnet.RHS(time, y, E, ydot);
         //calculate heating and cooling rats
         if (NON_BAROTROPIC_EOS) {
-          Edot0 = pmy_spec_->chemnet.Edot(time, y, E);
+          Edot = pmb->pscalars->chemnet.Edot(time, y, E);
         }
         //get the sub-cycle dt 
         tsub = 0.3 * GetChemTime(y, ydot, E, Edot);
@@ -515,6 +519,7 @@ Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
   const Real small_ = 1024 * std::numeric_limits<float>::min();
   //put floor in species abundance
   Real yf[NSPECIES];
+  Real yfloor = 1e-3;
   for (int ispec=0; ispec<=NSPECIES; ispec++) {
     yf[ispec] = std::max(y[ispec], yfloor);
   }
