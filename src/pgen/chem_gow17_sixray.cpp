@@ -527,7 +527,7 @@ Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
   Real tchem = std::abs( yf[0]/(ydot[0] + small_) );
   for (int ispec=1; ispec<NSPECIES; ispec++) {
     tchem = std::min( tchem, std::abs(yf[ispec]/(ydot[ispec]+small_)) );
-  }
+  } 
   if (NON_BAROTROPIC_EOS) {
     tchem = std::min( tchem, std::abs(E/(Edot+small_)) );
   }
