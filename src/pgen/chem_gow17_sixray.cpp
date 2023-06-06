@@ -79,6 +79,7 @@ namespace {
   AthenaArray<Real> G0_iang;
   Real G0, cr_rate;
   Real dfloor, pfloor;
+  Real cfl_cool_sub;
 } //namespace
 
 
@@ -115,7 +116,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
   G0_iang(BoundaryFace::outer_x2) = pin->GetOrAddReal("chem_radiation", "G0_outer_x2", G0);
   G0_iang(BoundaryFace::outer_x3) = pin->GetOrAddReal("chem_radiation", "G0_outer_x3", G0);
   cr_rate = pin->GetOrAddReal("chem_radiation", "CR", 2e-16);
-
+  cfl_cool_sub = pin->GetOrAddReal("chemistry", "cfl_cool_sub", 0.5);
   return;
 }
 
@@ -500,7 +501,7 @@ Real CoolingTimeStep(MeshBlock *pmb){
           Edot = pmb->pscalars->chemnet.Edot(time, y, E);
         }
         //get the sub-cycle dt 
-        tsub = 0.3 * GetChemTime(y, ydot, E, Edot);
+        tsub = cfl_cool_sub * GetChemTime(y, ydot, E, Edot);
         min_dt = std::min(tsub, min_dt);
 
       }
