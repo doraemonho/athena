@@ -68,6 +68,10 @@ void SixRayBoundaryInnerX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &
 void SixRayBoundaryOuterX3(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
                            FaceField &b, Real time, Real dt,
                            int il, int iu, int jl, int ju, int kl, int ku, int ngh);
+
+Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
+                   const Real E, const Real Edot);
+
 Real CoolingTimeStep(MeshBlock *pmb);
 
 //Radiation boundary
@@ -464,29 +468,63 @@ Real CoolingTimeStep(MeshBlock *pmb){
                            * unit_vel_in_cms_ * unit_vel_in_cms_;
   const Real unit_time_in_s_ = unit_length_in_cm_/unit_vel_in_cms_;
   const Real  g = 5.0/3.0;
-  Real min_dt = 0.3*pmb->pcoord->dx1f(0)/std::abs(pmb->phydro->u(IVX,pmb->ke,pmb->je,pmb->ie));
+
+  Real    E = 0;
+  Real Edot = 0;
+  Real    y[NSPECIES];
+  Real ydot[NSPECIES];
+
+  pmy_spec_ = pmb->pscalars;
+  Real min_dt = pmb->pmy_mesh->dt; //MHD timestep
+  Real time = pmb->pmy_mesh->time;//code time
+
   for (int k=pmb->ks; k<=pmb->ke; ++k) {
     for (int j=pmb->js; j<=pmb->je; ++j) {
       for (int i=pmb->is; i<=pmb->ie; ++i) {
-        Real   nH_  = pmb->phydro->u(IDN,k,j,i)*unit_density_in_nH_;
-        Real   ED   = pmb->phydro->w(IPR,k,j,i)/(g-1.0);
-        Real E_ergs = ED * unit_E_in_cgs_ / nH_;
-        Real     T  =  E_ergs / (1.5*1.381e-16);
-        Real Heating = 2e-26;
-        Real Cooling = 2e-26*nH_*(1e7*exp(-1.184e5/(T+ 1e3)) + 1.4e-2*sqrt(T)*exp(-92/T));
-        Real dEdt    = Heating;
 
-        if (T > 20) {
-          dEdt = dEdt - Cooling;
+        E = pmb->phydro->w(IPR,k,j,i)/(g-1.0);
+
+        pmy_spec_->chemnet.InitializeNextStep(k, j, i);
+        //copy species abundance
+        for (int ispec=0; ispec<=NSPECIES; ispec++) {
+          y[ispec] = pmy_spec_->s(ispec,k,j,i)/u(IDN,k,j,i);
         }
-        Real cool_dt = std::abs(0.3*E_ergs/dEdt/unit_time_in_s_);
-        
-        if (min_dt > cool_dt){
-          min_dt   = cool_dt;
+        //calculate reaction rates
+        pmy_spec_->chemnet.RHS(time, y, E, ydot);
+        //calculate heating and cooling rats
+        if (NON_BAROTROPIC_EOS) {
+          Edot0 = pmy_spec_->chemnet.Edot(time, y, E);
         }
+        //get the sub-cycle dt 
+        tsub = 0.3 * GetChemTime(y, ydot, E, Edot);
+        min_dt = std::min(tsub, min_dt);
+
       }
     }
   }
-  //std::cout<<"finishing Timestep"<<std::endl;
+
   return min_dt;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
+//                       const Real E, const Real Edot)
+//! \brief calculate chemistry timescale
+Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
+                 const Real E, const Real Edot) {
+  const Real small_ = 1024 * std::numeric_limits<float>::min();
+  //put floor in species abundance
+  Real yf[NSPECIES];
+  for (int ispec=0; ispec<=NSPECIES; ispec++) {
+    yf[ispec] = std::max(y[ispec], yfloor);
+  }
+  //calculate chemistry timescale
+  Real tchem = std::abs( yf[0]/(ydot[0] + small_) );
+  for (int ispec=1; ispec<NSPECIES; ispec++) {
+    tchem = std::min( tchem, std::abs(yf[ispec]/(ydot[ispec]+small_)) );
+  }
+  if (NON_BAROTROPIC_EOS) {
+    tchem = std::min( tchem, std::abs(E/(Edot+small_)) );
+  }
+  return tchem;
 }
