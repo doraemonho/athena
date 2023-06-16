@@ -169,11 +169,10 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
 
   return;
 }
-
 Real CoolingTimeStep(MeshBlock *pmb){
 
   AthenaArray<Real> &u = pmb->phydro->u;
-  const Real yfloor = 3e-3;
+  const Real yfloor = 1e-3;
   const Real unit_length_in_cm_  = 3.086e+18;
   const Real unit_vel_in_cms_    = 1.0e5;
   const Real unit_density_in_nH_ = 1;
@@ -216,6 +215,33 @@ Real CoolingTimeStep(MeshBlock *pmb){
       }
     }
   }
+
+  return min_dt;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
+//                       const Real E, const Real Edot)
+//! \brief calculate chemistry timescale
+Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
+                 const Real E, const Real Edot) {
+  const Real small_ = 1024 * std::numeric_limits<float>::min();
+  //put floor in species abundance
+  Real yf[NSPECIES];
+  Real yfloor = 1e-3;
+  for (int ispec=0; ispec<=NSPECIES; ispec++) {
+    yf[ispec] = std::max(y[ispec], yfloor);
+  }
+  //calculate chemistry timescale
+  Real tchem = std::abs( yf[0]/(ydot[0] + small_) );
+  for (int ispec=1; ispec<NSPECIES; ispec++) {
+    tchem = std::min( tchem, std::abs(yf[ispec]/(ydot[ispec]+small_)) );
+  } 
+  if (NON_BAROTROPIC_EOS) {
+    tchem = std::min( tchem, std::abs(E/(Edot+small_)) );
+  }
+  return tchem;
+}
 
 void MeshBlock::UserWorkInLoop() {
   const Real unit_length_in_cm_  = 3.086e+18;
