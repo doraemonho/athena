@@ -171,6 +171,9 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
 }
 
 Real CoolingTimeStep(MeshBlock *pmb){
+
+  AthenaArray<Real> &u = pmb->phydro->u;
+  const Real yfloor = 3e-3;
   const Real unit_length_in_cm_  = 3.086e+18;
   const Real unit_vel_in_cms_    = 1.0e5;
   const Real unit_density_in_nH_ = 1;
@@ -178,33 +181,41 @@ Real CoolingTimeStep(MeshBlock *pmb){
                            * unit_vel_in_cms_ * unit_vel_in_cms_;
   const Real unit_time_in_s_ = unit_length_in_cm_/unit_vel_in_cms_;
   const Real  g = 5.0/3.0;
-  Real min_dt = 0.3*pmb->pcoord->dx1f(0)/std::abs(pmb->phydro->u(IVX,pmb->ke,pmb->je,pmb->ie));
+
+  Real    E = 0;
+  Real Edot = 0;
+  Real    y[NSPECIES];
+  Real ydot[NSPECIES];
+  
+  Real min_dt = pmb->pmy_mesh->dt; //MHD timestep
+  Real time = pmb->pmy_mesh->time;//code time
+  Real tsub = 0.0;
+
+
   for (int k=pmb->ks; k<=pmb->ke; ++k) {
     for (int j=pmb->js; j<=pmb->je; ++j) {
       for (int i=pmb->is; i<=pmb->ie; ++i) {
-        Real   nH_  = pmb->phydro->u(IDN,k,j,i)*unit_density_in_nH_;
-        Real   ED   = pmb->phydro->w(IPR,k,j,i)/(g-1.0);
-        Real E_ergs = ED * unit_E_in_cgs_ / nH_;
-        Real     T  =  E_ergs / (1.5*1.381e-16);
-        Real Heating = 2e-26;
-        Real Cooling = 2e-26*nH_*(1e7*exp(-1.184e5/(T+ 1e3)) + 1.4e-2*sqrt(T)*exp(-92/T));
-        Real dEdt    = Heating;
 
-        if (T > 20) {
-          dEdt = dEdt - Cooling;
+        E = pmb->phydro->w(IPR,k,j,i)/(g-1.0);
+
+        pmb->pscalars->chemnet.InitializeNextStep(k, j, i);
+        //copy species abundance
+        for (int ispec=0; ispec<=NSPECIES; ispec++) {
+          y[ispec] = pmb->pscalars->s(ispec,k,j,i)/u(IDN,k,j,i);
         }
-        Real cool_dt = std::abs(0.3*E_ergs/dEdt/unit_time_in_s_);
-        
-        if (min_dt > cool_dt){
-          min_dt   = cool_dt;
+        //calculate reaction rates
+        pmb->pscalars->chemnet.RHS(time, y, E, ydot);
+        //calculate heating and cooling rats
+        if (NON_BAROTROPIC_EOS) {
+          Edot = pmb->pscalars->chemnet.Edot(time, y, E);
         }
+        //get the sub-cycle dt 
+        tsub = cfl_cool_sub * GetChemTime(y, ydot, E, Edot);
+        min_dt = std::min(tsub, min_dt);
+
       }
     }
   }
-  //std::cout<<"finishing Timestep"<<std::endl;
-  return min_dt;
-}
-
 
 void MeshBlock::UserWorkInLoop() {
   const Real unit_length_in_cm_  = 3.086e+18;
