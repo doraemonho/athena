@@ -45,6 +45,8 @@
 #include "../scalars/scalars.hpp"
 
 Real CoolingTimeStep(MeshBlock *pmb);
+Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
+                   const Real E, const Real Edot);
 
 //========================================================================================
 //! \fn void Mesh::InitUserMeshData(ParameterInput *pin)
