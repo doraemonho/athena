@@ -48,6 +48,12 @@ Real CoolingTimeStep(MeshBlock *pmb);
 Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
                    const Real E, const Real Edot);
 
+//Radiation boundary
+namespace {
+  Real cfl_cool_sub;
+} //namespace
+
+
 //========================================================================================
 //! \fn void Mesh::InitUserMeshData(ParameterInput *pin)
 //========================================================================================
@@ -65,7 +71,8 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 #endif
 }
 
-EnrollUserTimeStepFunction(CoolingTimeStep);
+EnrollUserTimeStepFunction(CoolingTimeStep);  
+cfl_cool_sub = pin->GetOrAddReal("chemistry", "cfl_cool_sub", 0.3);
 
   return;
 }
