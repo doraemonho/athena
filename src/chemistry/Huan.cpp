@@ -263,7 +263,7 @@ void IntegrateFullSubstep(Real tsub,
   if (NON_BAROTROPIC_EOS) {
     E += ( Edot0 + Edot1 ) * tsub * 0.5;
     if  ( E < Efloor){
-      E = Efloor
+      E = Efloor;
     }
   }
   return;
