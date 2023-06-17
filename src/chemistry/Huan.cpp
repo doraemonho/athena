@@ -165,7 +165,7 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
             std::stringstream msg;
             msg << "### FATAL ERROR in function ODEWrapper::Integrate: "
               << "Maximum number of substeps = " << nsub_max 
-              << ", tnow = "  << tnow << ", tleft = "  << tleft << ", tsub = " << tsub
+              << ", tnow = "  << tnow << ", tleft = "  << tleft << ", tsub = " << tsub << "E = " << E << "y[0] = " << y[0] 
               << " exceeded for Huan solver." << std::endl;
             ATHENA_ERROR(msg);
           }
