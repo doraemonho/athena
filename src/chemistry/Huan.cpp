@@ -31,6 +31,7 @@
 namespace {
   Real cfl_cool_sub; //cfl number for subcycling
   Real yfloor; //species abundance floor for calculating the cooling time
+  Real Efloor; // Energy floor for calculating the cooling time
   int nsub_max; //maximum number of substeps
   Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
                    const Real E, const Real Edot);
@@ -53,6 +54,7 @@ ODEWrapper::ODEWrapper(MeshBlock *pmb, ParameterInput *pin) {
   output_zone_sec_ = pin->GetOrAddBoolean("chemistry", "output_zone_sec", false);
   cfl_cool_sub = pin->GetOrAddReal("chemistry","cfl_cool_sub",0.1);
   yfloor = pin->GetOrAddReal("chemistry","yfloor",1e-3);
+  Efloor = pin->GetOrAddReal("chemistry","Efloor",1e-3);
   nsub_max = pin->GetOrAddInteger("chemistry","nsub_max",1e5);
 }
 
@@ -260,6 +262,9 @@ void IntegrateFullSubstep(Real tsub,
   }
   if (NON_BAROTROPIC_EOS) {
     E += ( Edot0 + Edot1 ) * tsub * 0.5;
+    if  ( E < Efloor){
+      E = Efloor
+    }
   }
   return;
 }
