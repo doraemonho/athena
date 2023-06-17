@@ -214,11 +214,17 @@ Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
   const Real small_ = 1024 * std::numeric_limits<float>::min();
   //put floor in species abundance
   Real yf[NSPECIES];
-  for (int ispec=0; ispec<=NSPECIES; ispec++) {
-    yf[ispec] = std::max(y[ispec], yfloor);
+  if NSPECIES > 1 {
+    for (int ispec=0; ispec<=NSPECIES; ispec++) {
+      yf[ispec] = std::max(y[ispec], yfloor);
+    }
+    //calculate chemistry timescale
+    Real tchem = std::abs( yf[0]/(ydot[0] + small_) );
+  }else{
+    // define a pre-set time if no species exists.
+    Real tchem = std::abs( 1.0/small_);
   }
-  //calculate chemistry timescale
-  Real tchem = std::abs( yf[0]/(ydot[0] + small_) );
+
   for (int ispec=1; ispec<NSPECIES; ispec++) {
     tchem = std::min( tchem, std::abs(yf[ispec]/(ydot[ispec]+small_)) );
   }
