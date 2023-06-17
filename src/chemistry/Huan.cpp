@@ -214,7 +214,7 @@ Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
   const Real small_ = 1024 * std::numeric_limits<float>::min();
   //put floor in species abundance
   Real yf[NSPECIES];
-  if NSPECIES > 1 {
+  if (NSPECIES > 1) {
     for (int ispec=0; ispec<=NSPECIES; ispec++) {
       yf[ispec] = std::max(y[ispec], yfloor);
     }
