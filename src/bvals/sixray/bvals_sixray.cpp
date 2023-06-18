@@ -352,19 +352,19 @@ NeighborBlock *SixRayBoundaryVariable::GetFaceNeighbor(const BoundaryFace direct
     //Only done for the first match, and should be the only match for uniform mesh
     //AMR needed to be add later
     if (pnb->ni.type == NeighborConnect::face && pnb->fid == direction) {
-      // return pnb it is not at the boundary of the cubes, ugly but it works right?
-      if (direction == BoundaryFace::inner_x1 || direction == BoundaryFace::outer_x1){
-        if (pco->x1f(is) != pmb->block_size.x1min && pco->x1f(ie+1) != pmb->block_size.x1max){
-          return pnb;
-        }
-      }else if (direction == BoundaryFace::inner_x2 || direction == BoundaryFace::outer_x2){
-        if ( pco->x2f(js) != pmb->block_size.x2min && pco->x2f(je+1) != pmb->block_size.x2max){
-          return pnb;
-        }
-      }else if (direction == BoundaryFace::inner_x3 || direction == BoundaryFace::outer_x3){
-        if (pco->x3f(ks) != pmb->block_size.x3min && pco->x3f(ke+1) != pmb->block_size.x3max ){
-          return pnb;
-        }
+      // return pnb it is not at the boundary of the cubes, ugly but it works, right?
+      if (direction == BoundaryFace::inner_x1 && pco->x1f(is) != pmb->block_size.x1min ){
+        return pnb;
+      }else if ( direction == BoundaryFace::outer_x1 && pco->x1f(ie+1) != pmb->block_size.x1max){
+        return pnb;
+      }else if (direction == BoundaryFace::inner_x2 && pco->x2f(js) != pmb->block_size.x2min ){
+        return pnb;
+      }else if (direction == BoundaryFace::outer_x2 && pco->x2f(je+1) != pmb->block_size.x2max){
+        return pnb;
+      }else if (direction == BoundaryFace::inner_x3 && pco->x3f(ks) != pmb->block_size.x3min ){
+        return pnb;
+      }else if (direction == BoundaryFace::outer_x3 && pco->x3f(ke+1) != pmb->block_size.x3max){
+        return pnb;
       }
     }
   }
