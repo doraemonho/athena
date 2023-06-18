@@ -98,7 +98,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     throw std::runtime_error(msg.str().c_str());
     return;
 #endif
-  EnrollUserTimeStepFunction(CoolingTimeStep);
+  //EnrollUserTimeStepFunction(CoolingTimeStep);
 }
 
   //EnrollUserBoundaryFunction(BoundaryFace::inner_x1, SixRayBoundaryInnerX1);
