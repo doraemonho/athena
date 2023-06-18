@@ -347,7 +347,6 @@ NeighborBlock *SixRayBoundaryVariable::GetFaceNeighbor(const BoundaryFace direct
   int ie = pmb->ie; 
   int je = pmb->je; 
   int ke = pmb->ke;
-  std<<cout<<
   for (int n=0; n<pbval_->nneighbor; n++) {
     pnb = &pbval_->neighbor[n];
     //Only done for the first match, and should be the only match for uniform mesh
@@ -358,7 +357,7 @@ NeighborBlock *SixRayBoundaryVariable::GetFaceNeighbor(const BoundaryFace direct
           pco->x2f(js) != pmb->block_size.x2min &&
           pco->x2f(je) != pmb->block_size.x2max &&
           pco->x3f(ks) != pmb->block_size.x3min &&
-          pco->x3f(ke) != pmb->block_size.x3max ){// return pnb it is not at the boundary of the cubes, ugly but it works right?
+          pco->x3f(ke) != pmb->block_size.x3max ){ // return pnb it is not at the boundary of the cubes, ugly but it works right?
         return pnb;
       }
     }
