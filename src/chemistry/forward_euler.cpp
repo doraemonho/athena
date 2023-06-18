@@ -31,6 +31,7 @@
 namespace {
   Real cfl_cool_sub; //cfl number for subcycling
   Real yfloor; //species abundance floor for calculating the cooling time
+  Real Efloor;
   int nsub_max; //maximum number of substeps
   Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
                    const Real E, const Real Edot);
