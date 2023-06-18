@@ -212,9 +212,6 @@ void IntegrateOneSubstep(Real tsub, Real y[NSPECIES], const Real ydot[NSPECIES],
                          Real &E, const Real Edot) {
   for (int ispec=0; ispec<=NSPECIES; ispec++) {
     y[ispec] += ydot[ispec] * tsub;
-    if (y[ispec] < yfloor){
-      y[ispec] = yfloor;
-    }
   }
   if (NON_BAROTROPIC_EOS) {
     E += Edot * tsub;
