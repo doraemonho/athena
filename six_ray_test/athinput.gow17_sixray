@@ -1,0 +1,104 @@
+<comment>
+problem   = Simulation with GOW17 Network, 100 pc box, H-H2 chem. network 
+reference = 
+configure =  python configure.py --prob=chem_gow17_sixray --chemistry=gow17 --chem_radiation=six_ray -fft -mpi -hdf5 --ode_solver=forward_euler --nscalars=12 --hdf5_path=/opt/cray/pe/hdf5-parallel/1.12.2.1/gnu/9.1/ --fftw_path=/opt/cray/pe/fftw/3.3.10.2/x86_milan
+
+<job>
+problem_id = chem_gow17_UNM  # problem ID: basename of output filenames
+
+<output1>
+file_type  = hst        # History data dump
+dt         = 0.001      # time increment between outputs
+
+<output2>
+file_type  = hdf5       # Binary data dump
+variable   = prim       # variables to be output
+dt         = 1.0        # time limit, 1000 Gyr -> 1e6*1e6 yr May be the unit is Myr ?
+
+#<output3>
+#file_type  = rst        # History data dump
+#dt         = 2.0        # time increment between outputs
+
+<time>
+cfl_number = 0.3        # The Courant, Friedrichs, & Lewy (CFL) Number
+nlim       = 20000      # cycle limit -???? why dt = tlim/nlim?
+tlim       = 100        # time limit, 1000 Gyr -> 1e6*1e6 yr May be the unit is Myr ?
+integrator  = vl2       # time integration algorithm
+xorder      = 2         # order of spatial reconstruction
+
+<mesh>
+nx1        = 64        # Number of zones in X1-direction
+x1min      = -50       # minimum value of X1
+x1max      =  50       # maximum value of X1
+ix1_bc     = periodic  # ner-X1 boundary flag
+ox1_bc     = periodic  # outer-X1 boundary flag
+
+nx2        = 64        # Number of zones in X2-direction
+x2min      = -50       # minimum value of X2
+x2max      =  50       # maximum value of X2
+ix2_bc     = periodic  # inner-X2 boundary flag
+ox2_bc     = periodic  # outer-X2 boundary flag
+
+nx3        = 64        # Number of zones in X3-direction
+x3min      =  -50      # minimum value of X3
+x3max      =   50      # maximum value of X3
+ix3_bc     = periodic   # inner-X3 boundary flag
+ox3_bc     = periodic   # outer-X3 boundary flag
+
+<meshblock>
+nx1        =  32
+nx2        =  32
+nx3        =  32
+
+#hydro block is mendatory
+<hydro>
+gamma           = 1.666666666667 # gamma = C_p/C_v
+iso_sound_speed = 3.66           # equavalent to sqrt(gamma*p/d) (unit: May be km s^-1 ?)
+sfloor   =   0                   # passive scalar floor
+
+<problem>
+nH         = 2.0      # The density of each pixel (Unit: mH cm^-3 ?)
+s_init     = 1.0e-6   # initial abundances
+turb_flag  = 2        # 2  )1 for decaying, 2 (impulsive) or 3 (continuous) for driven turbulence
+b0         = 2.0      # The B-field stregth (Unit 0.183 \mu G ? )
+angle      = 0.0      # The B-field angle to y-direction
+urms       = 0.0      # The rms of velocity
+
+<turbulence>
+dedt       = 3e6      # 200 )Energy injection rate (for driven) or Total energy (for decaying)
+nlow       = 0        # cut-off wavenumber at low-k
+nhigh      = 12       # cut-off wavenumber at high-k
+expo       = 2.0      # power-law exponent
+tcorr      = 0.5      # correlation time for OU process (both impulsive and continuous)
+dtdrive    = 0.2      # time interval between perturbation (impulsive)
+rseed      = 8964       # if non-negative, seed will be set by hand (slow PS generation)
+
+<chemistry>
+#chemistry network parameters
+Zdg        = 1.   # metallicity, dust and gas metallicity are the same. default = 1.
+temperature = 20  # T in Kelvin, if const_T_flag is true.
+temp_min_cool = 50.0
+temp_min_rates = 10.0
+#chemistry solver parameters
+reltol     = 1.0e-2   # relative tolerance, default 1.0e-2
+abstol     = 1.0e-14  # absolute tolerance, default 1.0e-12
+#abstol_H2   = 1.0e-10 
+#abstol_E   = 1e-4      # for internal energy. Set to 0.01 K
+user_jac   = false      # flag for whether use user provided Jacobian. default false
+maxsteps   = 100000     # maximum number of steps in one integration. default 10000
+output_zone_sec = false  # output diagnostic
+unit_length_in_pc = 1.
+
+#default parameters
+xHe        = 0.1    # He per H, default = 0.1
+xC         = 1.6e-4 # C atom per H, this is Z=1 value, default 1.6e-4
+xO         = 3.2e-4 # O atom per H, this is Z=1 value, default 3.2e-4
+xS         = 3.5e-6 # S atom per H, this is Z=1 value, default 3.5e-6
+xSi        = 1.7e-6 # Si atom per H, this is Z=1 value, default 1.7e-6
+maxorder   = 2      # maximum order. Default 2.
+stldet     = 0      # stability limit detection. Default 0/false.
+
+<chem_radiation>
+G0         = 1.0   # radiation field strength, in Draine 1987 units 1e-6
+CR         = 2e-16  # Cosmic-ray ionization rate per H
+n_frequency  = 8
