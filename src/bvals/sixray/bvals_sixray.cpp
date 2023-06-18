@@ -125,21 +125,43 @@ void SixRayBoundaryVariable::SetupPersistentMPI() {
   return;
 }
 
+
 //----------------------------------------------------------------------------------------
 //! \fn void SixRayBoundaryVariable::StartReceiving(BoundaryCommSubset phase)
 //! \brief call MPI_Start for six-ray boundary
 void SixRayBoundaryVariable::StartReceiving(BoundaryCommSubset phase) {
   MeshBlock *pmb = pmy_block_;
-#ifdef MPI_PARALLEL
-  for (int n=0; n<pbval_->nneighbor; n++) {
-    NeighborBlock& nb = pbval_->neighbor[n];
-    //only face neighbors are used in six-ray
-    if (nb.ni.type == NeighborConnect::face
-        && nb.snb.rank != Globals::my_rank) {
-      MPI_Start(&(bd_var_.req_recv[nb.bufid]));
+  int is = pmb->is; 
+  int js = pmb->js; 
+  int ks = pmb->ks;
+  int ie = pmb->ie; 
+  int je = pmb->je; 
+  int ke = pmb->ke;  
+    Coordinates *pco = pmb->pcoord;  
+  #ifdef MPI_PARALLEL
+    for (int n=0; n<pbval_->nneighbor; n++) {
+      NeighborBlock& nb = pbval_->neighbor[n];
+      //only face neighbors are used in six-ray
+      if (nb.ni.type == NeighborConnect::face
+          && nb.snb.rank != Globals::my_rank ) {
+      if (nb.fid == BoundaryFace::inner_x1 && pco->x1f(is) == pmy_mesh_->mesh_size.x1min &&
+          pmy_mesh_->mesh_bcs[BoundaryFace::inner_x1] == BoundaryFlag::periodic ){
+        }else if( nb.fid == BoundaryFace::outer_x1 && pco->x1f(ie+1) == pmy_mesh_->mesh_size.x1max &&
+          pmy_mesh_->mesh_bcs[BoundaryFace::outer_x1] == BoundaryFlag::periodic ){
+        }else if( nb.fid == BoundaryFace::inner_x2 && pco->x2f(js) == pmy_mesh_->mesh_size.x2min &&
+          pmy_mesh_->mesh_bcs[BoundaryFace::inner_x2] == BoundaryFlag::periodic ){
+        }else if(nb.fid == BoundaryFace::outer_x2 && pco->x2f(je+1) == pmy_mesh_->mesh_size.x2max&&
+          pmy_mesh_->mesh_bcs[BoundaryFace::outer_x2] == BoundaryFlag::periodic ){
+        }else if(nb.fid == BoundaryFace::inner_x3 && pco->x3f(ks) == pmy_mesh_->mesh_size.x3min &&
+          pmy_mesh_->mesh_bcs[BoundaryFace::inner_x3] == BoundaryFlag::periodic ){
+        }else if(nb.fid == BoundaryFace::outer_x3 && pco->x3f(ke+1) == pmy_mesh_->mesh_size.x3max&&
+          pmy_mesh_->mesh_bcs[BoundaryFace::outer_x3] == BoundaryFlag::periodic ){ 
+        }else{
+          MPI_Start(&(bd_var_.req_recv[nb.bufid]));
+        }
+      }
     }
-  }
-#endif
+  #endif
   return;
 }
 
@@ -154,6 +176,7 @@ void SixRayBoundaryVariable::ClearBoundary(BoundaryCommSubset phase) {
       bd_var_.flag[nb.bufid] = BoundaryStatus::waiting;
       bd_var_.sflag[nb.bufid] = BoundaryStatus::waiting;
     }
+
 #ifdef MPI_PARALLEL
     if (nb.snb.rank != Globals::my_rank
         && nb.ni.type == NeighborConnect::face) {
@@ -347,29 +370,38 @@ NeighborBlock *SixRayBoundaryVariable::GetFaceNeighbor(const BoundaryFace direct
   int ie = pmb->ie; 
   int je = pmb->je; 
   int ke = pmb->ke;
+  int test;
   for (int n=0; n<pbval_->nneighbor; n++) {
     pnb = &pbval_->neighbor[n];
     //Only done for the first match, and should be the only match for uniform mesh
     //AMR needed to be add later
     if (pnb->ni.type == NeighborConnect::face && pnb->fid == direction) {
       // return pnb it is not at the boundary of the cubes, ugly but it works, right?
-      if (direction == BoundaryFace::inner_x1 && pco->x1f(is) != pmb->block_size.x1min ){
-        return pnb;
-      }else if ( direction == BoundaryFace::outer_x1 && pco->x1f(ie+1) != pmb->block_size.x1max){
-        return pnb;
-      }else if (direction == BoundaryFace::inner_x2 && pco->x2f(js) != pmb->block_size.x2min ){
-        return pnb;
-      }else if (direction == BoundaryFace::outer_x2 && pco->x2f(je+1) != pmb->block_size.x2max){
-        return pnb;
-      }else if (direction == BoundaryFace::inner_x3 && pco->x3f(ks) != pmb->block_size.x3min ){
-        return pnb;
-      }else if (direction == BoundaryFace::outer_x3 && pco->x3f(ke+1) != pmb->block_size.x3max){
-        return pnb;
+      if (direction == BoundaryFace::inner_x1 && pco->x1f(is) == pmy_mesh_->mesh_size.x1min &&
+          pmy_mesh_->mesh_bcs[BoundaryFace::inner_x1] == BoundaryFlag::periodic ){
+        return nullptr;
+      }else if ( direction == BoundaryFace::outer_x1 && pco->x1f(ie+1) == pmy_mesh_->mesh_size.x1max &&
+          pmy_mesh_->mesh_bcs[BoundaryFace::outer_x1] == BoundaryFlag::periodic ){
+        return nullptr;
+      }else if (direction == BoundaryFace::inner_x2 && pco->x2f(js) == pmy_mesh_->mesh_size.x2min &&
+          pmy_mesh_->mesh_bcs[BoundaryFace::inner_x2] == BoundaryFlag::periodic ){
+        return nullptr;
+      }else if (direction == BoundaryFace::outer_x2 && pco->x2f(je+1) == pmy_mesh_->mesh_size.x2max&&
+          pmy_mesh_->mesh_bcs[BoundaryFace::outer_x2] == BoundaryFlag::periodic ){
+        return nullptr;
+      }else if (direction == BoundaryFace::inner_x3 && pco->x3f(ks) == pmy_mesh_->mesh_size.x3min &&
+          pmy_mesh_->mesh_bcs[BoundaryFace::inner_x3] == BoundaryFlag::periodic ){
+        return nullptr;
+      }else if (direction == BoundaryFace::outer_x3 && pco->x3f(ke+1) == pmy_mesh_->mesh_size.x3max&&
+          pmy_mesh_->mesh_bcs[BoundaryFace::outer_x3] == BoundaryFlag::periodic ){
+        return nullptr;
       }
+      return pnb;
     }
   }
   return nullptr;
 }
+
 
 void SixRayBoundaryVariable::SendSixRayBoundaryBuffers(const BoundaryFace direction) {
   MeshBlock *pmb = pmy_block_;
