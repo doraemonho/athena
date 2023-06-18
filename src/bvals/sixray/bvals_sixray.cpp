@@ -334,14 +334,33 @@ BoundaryFace SixRayBoundaryVariable::GetOppositeBoundaryFace(
 
   return opp_direction;
 }
+
+//fid record the neigh's face
+// BoundaryFlag::periodic
 NeighborBlock *SixRayBoundaryVariable::GetFaceNeighbor(const BoundaryFace direction) {
+  MeshBlock *pmb = pmy_block_;
   NeighborBlock *pnb = nullptr;
+  Coordinates *pco = pmb->pcoord;
+  int is = pmb->is; 
+  int js = pmb->js; 
+  int ks = pmb->ks;
+  int ie = pmb->ie; 
+  int je = pmb->je; 
+  int ke = pmb->ke;
+  std<<cout<<
   for (int n=0; n<pbval_->nneighbor; n++) {
     pnb = &pbval_->neighbor[n];
     //Only done for the first match, and should be the only match for uniform mesh
     //AMR needed to be add later
     if (pnb->ni.type == NeighborConnect::face && pnb->fid == direction) {
-      return pnb;
+      if (pco->x1f(is) != pmb->block_size.x1min &&
+          pco->x1f(ie) != pmb->block_size.x1max &&
+          pco->x2f(js) != pmb->block_size.x2min &&
+          pco->x2f(je) != pmb->block_size.x2max &&
+          pco->x3f(ks) != pmb->block_size.x3min &&
+          pco->x3f(ke) != pmb->block_size.x3max ){// return pnb it is not at the boundary of the cubes, ugly but it works right?
+        return pnb;
+      }
     }
   }
   return nullptr;

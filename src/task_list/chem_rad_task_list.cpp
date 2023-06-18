@@ -201,7 +201,10 @@ TaskStatus ChemRadiationIntegratorTaskList::RecvAndSend_direction(MeshBlock *pmb
     int step, BoundaryFace direction) {
 #ifdef INCLUDE_CHEMISTRY
   SixRayBoundaryVariable *pbvar = &pmb->pchemrad->pchemradintegrator->col_bvar;
+  // nothing special, return the oppsite direction
   BoundaryFace direction_opp = pbvar->GetOppositeBoundaryFace(direction);
+  // IMPORTANT, get the neighnor face from the block
+  // return the pull pointer if no neighbor exist
   NeighborBlock *pnb = pbvar->GetFaceNeighbor(direction);
   NeighborBlock *pnb_opp = pbvar->GetFaceNeighbor(direction_opp);
   bool ret = true;
