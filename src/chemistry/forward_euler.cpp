@@ -50,6 +50,7 @@ ODEWrapper::ODEWrapper(MeshBlock *pmb, ParameterInput *pin) {
   output_zone_sec_ = pin->GetOrAddBoolean("chemistry", "output_zone_sec", false);
   cfl_cool_sub = pin->GetOrAddReal("chemistry","cfl_cool_sub",0.1);
   yfloor = pin->GetOrAddReal("chemistry","yfloor",1e-3);
+  Efloor = pin->GetOrAddReal("chemistry","Efloor",1e-3);
   nsub_max = pin->GetOrAddInteger("chemistry","nsub_max",1e5);
 }
 
@@ -210,9 +211,15 @@ void IntegrateOneSubstep(Real tsub, Real y[NSPECIES], const Real ydot[NSPECIES],
                          Real &E, const Real Edot) {
   for (int ispec=0; ispec<=NSPECIES; ispec++) {
     y[ispec] += ydot[ispec] * tsub;
+    if (y[ispec] < yfloor){
+      y = yfloor;
+    }
   }
   if (NON_BAROTROPIC_EOS) {
     E += Edot * tsub;
+    if (E < Efloor){
+      E = Efloor;
+    }
   }
   return;
 }
