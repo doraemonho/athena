@@ -245,6 +245,9 @@ void IntegrateHalfSubstep(Real tsub, Real y[NSPECIES], const Real ydot[NSPECIES]
   }
   if (NON_BAROTROPIC_EOS) {
     E += Edot * tsub;
+    if  ( E < Efloor){
+      E = Efloor;
+    }
   }
   return;
 }
