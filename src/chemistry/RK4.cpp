@@ -3,8 +3,8 @@
 // Copyright(C) 2014 James M. Stone <jmstone@princeton.edu> and other code contributors
 // Licensed under the 3-clause BSD License, see LICENSE file for details
 //========================================================================================
-//! \file Huan.cpp
-//! \brief implementation of the Huan method solver (improved Euler with 2 order accuracy)
+//! \file RK4.cpp
+//! \brief implementation of the RK4 method solver
 
 //c header
 #include <stdio.h> //c style io
@@ -34,12 +34,18 @@ namespace {
   Real Efloor; // Energy floor for calculating the cooling time
   int nsub_max; //maximum number of substeps
   Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
-                   const Real E, const Real Edot);
-  void IntegrateHalfSubstep(Real tsub, Real y[NSPECIES], const Real ydot[NSPECIES],
-                           Real &E, const Real Edot);
+                   const Real E, const Real Edot);      
+  void PrintChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
+                   const Real E, const Real Edot);        
+  void RK4_2ndstep(Real tsub, Real y[NSPECIES], Real yi[NSPECIES], Real ydot[NSPECIES],
+                    Real &E, Real &Ei, Real &Edot);
+  void RK4_3rdstep(Real tsub, Real y[NSPECIES], Real yi[NSPECIES], Real ydot[NSPECIES],
+                    Real &E, Real &Ei, Real &Edot);
+  void RK4_4thstep(Real tsub, Real y[NSPECIES], Real yi[NSPECIES], Real ydot[NSPECIES],
+                    Real &E, Real &Ei, Real &Edot);
   void IntegrateFullSubstep(Real tsub, 
-                             Real y[NSPECIES], const Real ydot0[NSPECIES], const Real ydot1[NSPECIES],
-                             Real &E, const Real Edot0, const Real Edot1);
+                             Real y[NSPECIES], Real ydot0[NSPECIES], Real ydot1[NSPECIES],  Real ydot2[NSPECIES],  Real ydot3[NSPECIES],
+                             Real &E, Real &Edot0, Real &Edot1, Real &Edot2, Real &Edot3);
 } //namespace
 
 //----------------------------------------------------------------------------------------
@@ -52,7 +58,7 @@ ODEWrapper::ODEWrapper(MeshBlock *pmb, ParameterInput *pin) {
     dim_ = NSPECIES;
   }
   output_zone_sec_ = pin->GetOrAddBoolean("chemistry", "output_zone_sec", false);
-  cfl_cool_sub = pin->GetOrAddReal("chemistry","cfl_cool_sub",0.1);
+  cfl_cool_sub = pin->GetOrAddReal("chemistry","cfl_cool_sub",0.3);
   yfloor = pin->GetOrAddReal("chemistry","yfloor",1e-3);
   Efloor = pin->GetOrAddReal("chemistry","Efloor",1e-3);
   nsub_max = pin->GetOrAddInteger("chemistry","nsub_max",1e5);
@@ -91,16 +97,20 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
   AthenaArray<Real> &u = pmy_block_->phydro->u;
   AthenaArray<Real> &bcc = pmy_block_->pfield->bcc;
   //chemical species and rates
-  Real  y[NSPECIES];
-  Real y1[NSPECIES];
+  Real   y[NSPECIES];
+  Real  yi[NSPECIES];
   Real ydot0[NSPECIES];
   Real ydot1[NSPECIES];
+  Real ydot2[NSPECIES];
+  Real ydot3[NSPECIES];
   //internal energy and rates
   Real  E = 0.; 
-  Real E1 = 0.;
+  Real Ei = 0.;
   Real Edot0 = 0.;
   Real Edot1 = 0.;
-  Real time = pmy_block_->pmy_mesh->time;//code time
+  Real Edot2 = 0.;
+  Real Edot3 = 0.;
+  Real time = pmy_block_->pmy_mesh->time; //code time
   Real dt_mhd = pmy_block_->pmy_mesh->dt; //MHD timestep
   //subcycling variables
   Real tend, tsub, tnow, tleft;
@@ -112,7 +122,7 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
         pmy_spec_->chemnet.InitializeNextStep(k, j, i);
         //copy species abundance
         for (int ispec=0; ispec<=NSPECIES; ispec++) {
-          y[ispec] = y1[ispec] = pmy_spec_->s(ispec,k,j,i)/u(IDN,k,j,i);
+          y[ispec] = pmy_spec_->s(ispec,k,j,i)/u(IDN,k,j,i);
         }
         //assign internal energy, if not isothermal eos
         if (NON_BAROTROPIC_EOS) {
@@ -123,7 +133,6 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
             E -= 0.5*(
                 SQR(bcc(IB1,k,j,i)) + SQR(bcc(IB2,k,j,i)) + SQR(bcc(IB3,k,j,i)) );
           }
-          E1 = E;
         }
         //subcycling
         icount = 0;
@@ -132,8 +141,8 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
         tleft = dt_mhd;
         while (tnow < tend) {
           
-          // half step calcution using forward Euler method
-          //calculate reaction rates
+          //first step calcution using forward Euler method for getting the sub-cycle dt  
+          // calculate reaction rates
           pmy_spec_->chemnet.RHS(time, y, E, ydot0);
           //calculate heating and cooling rats
           if (NON_BAROTROPIC_EOS) {
@@ -143,25 +152,35 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
           tsub = cfl_cool_sub * GetChemTime(y, ydot0, E, Edot0);
           tsub = std::min(tsub, tleft);
           
-          //advance half step
-          IntegrateHalfSubstep(tsub, y1, ydot0, E1, Edot0);
-
-          //Full step calcuation
-          //calculate reaction rates
-          pmy_spec_->chemnet.RHS(time, y1, E1, ydot1);
-          //calculate heating and cooling rats
+          // Start of RK4 computation
+          RK4_2ndstep(tsub, y, yi, ydot0, E, Ei, Edot0);
+          pmy_spec_->chemnet.RHS(time + tsub/2, yi, Ei, ydot1);
           if (NON_BAROTROPIC_EOS) {
-            Edot1 = pmy_spec_->chemnet.Edot(time, y1, E1);
+            Edot1 = pmy_spec_->chemnet.Edot(time + tsub/2, yi, Ei);
           }
 
+          RK4_3rdstep(tsub, y, yi, ydot1, E, Ei, Edot1);
+          pmy_spec_->chemnet.RHS(time + tsub/2, yi, Ei, ydot2);
+          if (NON_BAROTROPIC_EOS) {
+            Edot2 = pmy_spec_->chemnet.Edot(time + tsub/2, yi, Ei);
+          }
+
+          RK4_4thstep(tsub, y, yi, ydot2, E, Ei, Edot2);
+          pmy_spec_->chemnet.RHS(time + tsub, yi, Ei, ydot3);
+          if (NON_BAROTROPIC_EOS) {
+            Edot3 = pmy_spec_->chemnet.Edot(time + tsub, yi, Ei);
+          }
+          
           // advance the full step
-          IntegrateFullSubstep(tsub, y, ydot0, ydot1, E, Edot0, Edot1);
+          IntegrateFullSubstep(tsub, y, ydot0, ydot1, ydot2, ydot3, E, Edot0, Edot1, Edot2, Edot3);
 
           //update timing
           tnow += tsub;
           tleft = tend - tnow;
           icount++;
 
+          if (icount > nsub_max - 1)
+            PrintChemTime(y, ydot0, E, Edot0);
           //check maximum number of steps
           if (icount > nsub_max) {
             std::stringstream msg;
@@ -170,6 +189,9 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
               << ", tnow = "  << tnow << ", tleft = "  << tleft << ", tsub = " << tsub << "E = " << E << "y[0] = " << y[0] 
               << " exceeded for Huan solver." << std::endl;
             ATHENA_ERROR(msg);
+          }
+          for (int ispec=0; ispec<=NSPECIES; ispec++) {
+            ydot0[ispec] = ydot1[ispec] = Edot0 = Edot1 = 0.0;
           }
         }
         //copy species abundance back to s
@@ -234,20 +256,88 @@ Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
   return tchem;
 }
 
+void PrintChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
+                 const Real E, const Real Edot) {
+  const Real small_ = 1024 * std::numeric_limits<float>::min();
+  Real tchem = std::abs( 1.0/small_);
+  //put floor in species abundance
+  Real yf[NSPECIES];
+  if (NSPECIES > 1) {
+    for (int ispec=0; ispec<=NSPECIES; ispec++) {
+      yf[ispec] = std::max(y[ispec], yfloor);
+    }
+    //calculate chemistry timescale
+    tchem = std::abs( yf[0]/(ydot[0] + small_) );
+    printf("y[%d] = %.2e, ydot, t_chem = %.2e, %.2e \n",0, y[0], ydot[0], tchem);
+    for (int ispec=0; ispec<NSPECIES; ispec++) {
+      tchem = std::abs(yf[ispec]/(ydot[ispec]+small_));
+      printf("y[%d] = %.2e, ydot, t_chem = %.2e, %.2e \n", ispec, y[ispec], ydot[ispec], tchem);
+    }
+  }
+
+  if (NON_BAROTROPIC_EOS) {
+    tchem =  std::abs(E/(Edot+small_));
+    printf("E, t_chem = %.2e \n", tchem);
+  }
+  return ;
+}
+
 //----------------------------------------------------------------------------------------
-//! \fn void IntegrateHalfSubstep(Real tsub, Real y[NSPECIES], const Real ydot[NSPECIES],
-//!                              Real &E, const Real Edot)
-//! \brief advance the half-step of chemical abundance and energy for tsub
-void IntegrateHalfSubstep(Real tsub, Real y[NSPECIES], const Real ydot[NSPECIES],
-                         Real &E, const Real Edot) {
+//! \fn void RK4_2ndstep(Real tsub, Real y[NSPECIES], Real yi[NSPECIES], const Real ydot[NSPECIES],
+//                            Real &E, const Real Ei, const Real Edot)
+//! \brief advance the RK4 second part of y_n + h*k1/2 
+void RK4_2ndstep(Real tsub, Real y[NSPECIES], Real yi[NSPECIES],  Real ydot[NSPECIES],
+                            Real &E, Real &Ei, Real &Edot) {
+  const Real small_ = 1024 * std::numeric_limits<float>::min();
   for (int ispec=0; ispec<NSPECIES; ispec++) {
-    y[ispec] += ydot[ispec] * tsub;
+    yi[ispec] = y[ispec] + ydot[ispec] * tsub * 0.5;
+    if (yi[ispec] < 0.0)
+      yi[ispec] = small_;
   }
   if (NON_BAROTROPIC_EOS) {
-    E += Edot * tsub;
-    if  ( E < Efloor){
-      E = Efloor;
-    }
+    Ei = E + Edot * tsub * 0.5;
+    if  ( E < Efloor)
+      Ei = Efloor;
+  }
+  return;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn void RK4_3rdstep(Real tsub, Real y[NSPECIES], Real yi[NSPECIES], const Real ydot[NSPECIES],
+//                            Real &E, const Real Ei, const Real Edot)
+//! \brief advance the RK4 third part of y_n + h*k2/2 
+void RK4_3rdstep(Real tsub, Real y[NSPECIES], Real yi[NSPECIES], Real ydot[NSPECIES],
+                            Real &E, Real &Ei, Real &Edot) {
+  const Real small_ = 1024 * std::numeric_limits<float>::min();
+  for (int ispec=0; ispec<NSPECIES; ispec++) {
+    yi[ispec] = y[ispec] + ydot[ispec] * tsub * 0.5;
+    if (yi[ispec] < 0.0)
+      yi[ispec] = small_;
+  }
+  if (NON_BAROTROPIC_EOS) {
+    Ei = E + Edot * tsub * 0.5;
+    if  ( E < Efloor)
+      Ei = Efloor;
+  }
+  return;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn void RK4_4thstep(Real tsub, Real y[NSPECIES], Real yi[NSPECIES], const Real ydot[NSPECIES],
+//                            Real &E, const Real Ei, const Real Edot)
+//! \brief advance the RK4 final part of y_n + h*k3 
+void RK4_4thstep(Real tsub, Real y[NSPECIES], Real yi[NSPECIES], Real ydot[NSPECIES],
+                            Real &E, Real &Ei, Real &Edot) {
+  const Real small_ = 1024 * std::numeric_limits<float>::min();
+  for (int ispec=0; ispec<NSPECIES; ispec++) {
+    yi[ispec] = y[ispec] + ydot[ispec] * tsub;
+    if (yi[ispec] < 0.0)
+      yi[ispec] = small_;
+  }
+  if (NON_BAROTROPIC_EOS) {
+    Ei = E + Edot * tsub;
+    if  ( E < Efloor)
+      Ei = Efloor;
   }
   return;
 }
@@ -258,13 +348,16 @@ void IntegrateHalfSubstep(Real tsub, Real y[NSPECIES], const Real ydot[NSPECIES]
 //!                               Real &E, const Real Edot0, const Real Edot1)
 //! \brief advance the full step of chemical abundance and energy for tsub
 void IntegrateFullSubstep(Real tsub, 
-                          Real y[NSPECIES], const Real ydot0[NSPECIES], const Real ydot1[NSPECIES],
-                          Real &E, const Real Edot0, const Real Edot1) {
+                          Real y[NSPECIES], Real ydot0[NSPECIES], Real ydot1[NSPECIES],  Real ydot2[NSPECIES], Real ydot3[NSPECIES],
+                          Real &E, Real &Edot0, Real &Edot1, Real &Edot2, Real &Edot3) {
+  const Real small_ = 1024 * std::numeric_limits<float>::min();                          
   for (int ispec=0; ispec<NSPECIES; ispec++) {
-    y[ispec] += (ydot0[ispec] + ydot1[ispec]) * tsub * 0.5;
+    y[ispec] += (ydot0[ispec] + 2*ydot1[ispec] + 2*ydot2[ispec] + ydot1[ispec]) * tsub / 6.0;
+    if (y[ispec] < 0.0)
+      y[ispec] = small_;
   }
   if (NON_BAROTROPIC_EOS) {
-    E += ( Edot0 + Edot1 ) * tsub * 0.5;
+    E += ( Edot0 + 2*Edot1 + 2*Edot2 + Edot3) * tsub / 6.0;
     if  ( E < Efloor){
       E = Efloor;
     }

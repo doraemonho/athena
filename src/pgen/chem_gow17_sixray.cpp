@@ -73,14 +73,16 @@ Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
                    const Real E, const Real Edot);
 
 Real CoolingTimeStep(MeshBlock *pmb);
+Real MyTimeStep(MeshBlock *pmb);
 
 //Radiation boundary
 namespace {
   AthenaArray<Real> G0_iang;
   Real G0, cr_rate;
   Real dfloor, pfloor;
-  Real cfl_cool_sub;
+  Real cfl_cool_sub, user_dt;
 } //namespace
+
 
 
 //========================================================================================
@@ -98,11 +100,13 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     throw std::runtime_error(msg.str().c_str());
     return;
 #endif
-
-//#ifdef NO_CVODE
-//  EnrollUserTimeStepFunction(CoolingTimeStep);
-//#endif
 }
+  //#ifdef NO_CVODE
+  //  EnrollUserTimeStepFunction(CoolingTimeStep);
+  //#endif
+  user_dt = pin->GetOrAddReal("time", "user_dt", 0.0);
+  if ( user_dt > 0.0 )
+    EnrollUserTimeStepFunction(MyTimeStep);
 
   //EnrollUserBoundaryFunction(BoundaryFace::inner_x1, SixRayBoundaryInnerX1);
   //EnrollUserBoundaryFunction(BoundaryFace::outer_x1, SixRayBoundaryOuterX1);
@@ -536,4 +540,12 @@ Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
     tchem = std::min( tchem, std::abs(E/(Edot+small_)) );
   }
   return tchem;
+}
+//----------------------------------------------------------------------------------------
+//! \fn MyTimeStep(MeshBlock *pmb)
+//! \brief Setup self-defined dt
+Real MyTimeStep(MeshBlock *pmb)
+{
+  Real min_user_dt = user_dt;
+  return min_user_dt;
 }

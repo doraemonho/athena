@@ -220,7 +220,7 @@ parser.add_argument('--chem_radiation',
 # --ode_solver argument
 parser.add_argument('--ode_solver',
                     default=None,
-                    choices=["cvode", "forward_euler","Huan"],
+                    choices=["cvode", "forward_euler","Heun",'RK4'],
                     help='ode solver for chemistry')
 
 # --cvode_path argument
