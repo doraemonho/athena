@@ -83,8 +83,6 @@ namespace {
   Real cfl_cool_sub, user_dt;
 } //namespace
 
-
-
 //========================================================================================
 //! \fn void Mesh::InitUserMeshData(ParameterInput *pin)
 //========================================================================================
@@ -101,11 +99,20 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     return;
 #endif
 }
-  #ifdef NO_CVODE
+
+  bool is_subcycling = pin->GetOrAddBoolean("time", "subcycling", false);
+  if (is_subcycling){
+#ifdef CVODE
+    std::stringstream msg;
+    msg << "### FATAL ERROR in ProblemGenerator::Chem_gow17_MHD" << std::endl
+        << "user enable both sub-cycling solver and CVODE solver" << std::endl;
+    throw std::runtime_error(msg.str().c_str());
+#endif
     EnrollUserTimeStepFunction(CoolingTimeStep);
-  #endif
+  }
+
   user_dt = pin->GetOrAddReal("time", "user_dt", 0.0);
-  if ( user_dt > 0.0 )
+  if ( user_dt > 0.0 && is_subcycling)
     EnrollUserTimeStepFunction(MyTimeStep);
 
   //EnrollUserBoundaryFunction(BoundaryFace::inner_x1, SixRayBoundaryInnerX1);
@@ -139,10 +146,10 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
   const int Nz = ke - ks + 1;
   //read input parameters
   const Real nH = pin->GetReal("problem", "nH"); //density
-  const Real vx = pin->GetOrAddReal("problem", "vx", 0); //velocity x
-  const Real vy = pin->GetOrAddReal("problem", "vy", 0); //velocity x
-  const Real vz = pin->GetOrAddReal("problem", "vz", 0); //velocity x
-  const Real b0 = pin->GetOrAddReal("problem", "b0", 0); //velocity x
+  const Real vx = pin->GetOrAddReal("problem", "vx", 0);
+  const Real vy = pin->GetOrAddReal("problem", "vy", 0);
+  const Real vz = pin->GetOrAddReal("problem", "vz", 0);
+  const Real b0 = pin->GetOrAddReal("problem", "b0", 0);
   const Real angle = (PI/180.0)*pin->GetOrAddReal("problem","angle",0.0);
   const Real G0 = pin->GetOrAddReal("problem", "G0", 0.);
 
@@ -152,8 +159,8 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
   const Real pres = nH*SQR(iso_cs);
   const Real gm1  = peos->GetGamma() - 1.0;
   Real float_min = std::numeric_limits<float>::min();
-  dfloor=pin->GetOrAddReal("hydro", "dfloor",(1024*(float_min)));
-  pfloor=pin->GetOrAddReal("hydro", "pfloor",(1024*(float_min)));  
+  pfloor = pin->GetOrAddReal("hydro", "pfloor",(1024*(float_min)));  
+  dfloor = pin->GetOrAddReal("hydro", "dfloor",(1024*(float_min)));
 
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
@@ -166,7 +173,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
         phydro->u(IM3, k, j, i) = nH*vz;
         //energy
         if (NON_BAROTROPIC_EOS) {
-          phydro->u(IEN, k, j, i) = pres/gm1 + 0.5*nH*SQR(vx);
+          phydro->u(IEN, k, j, i) = pres/gm1 + 0.5*nH*SQR(vx) + 0.5*nH*SQR(vy) +0.5*nH*SQR(vz);
         }
         if (MAGNETIC_FIELDS_ENABLED) {
           phydro->u(IEN,k,j,i)+=0.5*b0*b0;
@@ -261,7 +268,7 @@ void MeshBlock::UserWorkInLoop() {
                            * unit_vel_in_cms_ * unit_vel_in_cms_;
   const Real unit_time_in_s_ = unit_length_in_cm_/unit_vel_in_cms_;
   const Real  g =  peos->GetGamma();
-  const Real Tfloor = 10.0;
+  const Real Tfloor = 20.0;
   //set density and pressure floors
   for (int k=ks; k<=ke; k++) {
     for (int j=js; j<=je; j++) {
@@ -485,10 +492,11 @@ Real CoolingTimeStep(MeshBlock *pmb){
   Real    y[NSPECIES];
   Real ydot[NSPECIES];
   
-  Real min_dt = pmb->pmy_mesh->dt; //MHD timestep
-  Real time = pmb->pmy_mesh->time;//code time
+  //MHD timestep
+  Real min_dt = pmb->pmy_mesh->dt;
+  //code time
+  Real time = pmb->pmy_mesh->time;
   Real tsub = 0.0;
-
 
   for (int k=pmb->ks; k<=pmb->ke; ++k) {
     for (int j=pmb->js; j<=pmb->je; ++j) {
@@ -508,8 +516,9 @@ Real CoolingTimeStep(MeshBlock *pmb){
           Edot = pmb->pscalars->chemnet.Edot(time, y, E);
         }
         //get the sub-cycle dt 
-        //tsub = 100 * cfl_cool_sub * GetChemTime(y, ydot, E, Edot);
-        tsub = 1e-3;
+        tsub = 100 * cfl_cool_sub * GetChemTime(y, ydot, E, Edot);
+        // manually choosen dt to stablize the system 
+        tsub = std::min(8e-4, tsub);
         min_dt = std::min(tsub, min_dt);
 
       }
