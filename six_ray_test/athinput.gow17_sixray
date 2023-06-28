@@ -10,45 +10,46 @@ problem_id = chem_gow17_UNM  # problem ID: basename of output filenames
 file_type  = hst        # History data dump
 dt         = 0.001      # time increment between outputs
 
-<output2>
-file_type  = hdf5       # Binary data dump
-variable   = prim       # variables to be output
-dt         = 1.0        # time limit, 1000 Gyr -> 1e6*1e6 yr May be the unit is Myr ?
+#<output2>
+#file_type  = hdf5       # Binary data dump
+#variable   = prim       # variables to be output
+#dt         = 1.0        # time limit, 1000 Gyr -> 1e6*1e6 yr May be the unit is Myr ?
 
 #<output3>
 #file_type  = rst        # History data dump
 #dt         = 2.0        # time increment between outputs
 
 <time>
-cfl_number = 0.3        # The Courant, Friedrichs, & Lewy (CFL) Number
-nlim       = 20000      # cycle limit -???? why dt = tlim/nlim?
+cfl_number = 0.1        # The Courant, Friedrichs, & Lewy (CFL) Number
+nlim       = 200        # cycle limit -???? why dt = tlim/nlim?
 tlim       = 100        # time limit, 1000 Gyr -> 1e6*1e6 yr May be the unit is Myr ?
 integrator  = vl2       # time integration algorithm
 xorder      = 2         # order of spatial reconstruction
+user_dt     = 2e-3     
 
 <mesh>
-nx1        = 64        # Number of zones in X1-direction
+nx1        = 48        # Number of zones in X1-direction
 x1min      = -50       # minimum value of X1
 x1max      =  50       # maximum value of X1
 ix1_bc     = periodic  # ner-X1 boundary flag
 ox1_bc     = periodic  # outer-X1 boundary flag
 
-nx2        = 64        # Number of zones in X2-direction
+nx2        = 48        # Number of zones in X2-direction
 x2min      = -50       # minimum value of X2
 x2max      =  50       # maximum value of X2
 ix2_bc     = periodic  # inner-X2 boundary flag
 ox2_bc     = periodic  # outer-X2 boundary flag
 
-nx3        = 64        # Number of zones in X3-direction
+nx3        = 48        # Number of zones in X3-direction
 x3min      =  -50      # minimum value of X3
 x3max      =   50      # maximum value of X3
 ix3_bc     = periodic   # inner-X3 boundary flag
 ox3_bc     = periodic   # outer-X3 boundary flag
 
 <meshblock>
-nx1        =  32
-nx2        =  32
-nx3        =  32
+nx1        =  24
+nx2        =  24
+nx3        =  24
 
 #hydro block is mendatory
 <hydro>
@@ -75,18 +76,19 @@ rseed      = 8964       # if non-negative, seed will be set by hand (slow PS gen
 
 <chemistry>
 #chemistry network parameters
-Zdg        = 1.   # metallicity, dust and gas metallicity are the same. default = 1.
-temperature = 20  # T in Kelvin, if const_T_flag is true.
+cfl_cool_sub = 0.3
+Zdg        = 1.           # metallicity, dust and gas metallicity are the same. default = 1.
+temperature = 20          # T in Kelvin, if const_T_flag is true.
 temp_min_cool = 50.0
 temp_min_rates = 10.0
 #chemistry solver parameters
-reltol     = 1.0e-2   # relative tolerance, default 1.0e-2
-abstol     = 1.0e-14  # absolute tolerance, default 1.0e-12
+reltol     = 1.0e-2      # relative tolerance, default 1.0e-2
+abstol     = 1.0e-14     # absolute tolerance, default 1.0e-12
 #abstol_H2   = 1.0e-10 
 #abstol_E   = 1e-4      # for internal energy. Set to 0.01 K
 user_jac   = false      # flag for whether use user provided Jacobian. default false
 maxsteps   = 100000     # maximum number of steps in one integration. default 10000
-output_zone_sec = false  # output diagnostic
+output_zone_sec = true  # output diagnostic
 unit_length_in_pc = 1.
 
 #default parameters
