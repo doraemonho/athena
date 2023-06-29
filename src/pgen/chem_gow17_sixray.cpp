@@ -81,6 +81,7 @@ namespace {
   Real G0, cr_rate;
   Real dfloor, pfloor;
   Real cfl_cool_sub, user_dt;
+  int nsub_max;
 } //namespace
 
 //========================================================================================
@@ -131,6 +132,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
   G0_iang(BoundaryFace::outer_x3) = pin->GetOrAddReal("chem_radiation", "G0_outer_x3", G0);
   cr_rate = pin->GetOrAddReal("chem_radiation", "CR", 2e-16);
   cfl_cool_sub = pin->GetOrAddReal("chemistry", "cfl_cool_sub", 0.5);
+  nsub_max = pin->GetOrAddInteger("chemistry","nsub_max",1e5);
   return;
 }
 
@@ -516,7 +518,7 @@ Real CoolingTimeStep(MeshBlock *pmb){
           Edot = pmb->pscalars->chemnet.Edot(time, y, E);
         }
         //get the sub-cycle dt 
-        tsub = 200 * cfl_cool_sub * GetChemTime(y, ydot, E, Edot);
+        tsub = nsub_max * cfl_cool_sub * GetChemTime(y, ydot, E, Edot);
         // manually choosen timestep 1e-3 dt to stablize the system at the begining of the simulation
         tsub = std::min(1e-3, tsub);
         min_dt = std::min(tsub, min_dt);
