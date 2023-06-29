@@ -100,7 +100,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 #endif
 }
 
-  bool is_subcycling = pin->GetOrAddBoolean("time", "subcycling", false);
+  bool is_subcycling = pin->GetOrAddBoolean("chemistry", "subcycling", false);
   if (is_subcycling){
 #ifdef CVODE
     std::stringstream msg;
@@ -516,9 +516,9 @@ Real CoolingTimeStep(MeshBlock *pmb){
           Edot = pmb->pscalars->chemnet.Edot(time, y, E);
         }
         //get the sub-cycle dt 
-        tsub = 100 * cfl_cool_sub * GetChemTime(y, ydot, E, Edot);
-        // manually choosen dt to stablize the system 
-        tsub = std::min(8e-4, tsub);
+        tsub = 200 * cfl_cool_sub * GetChemTime(y, ydot, E, Edot);
+        // manually choosen timestep 1e-3 dt to stablize the system at the begining of the simulation
+        tsub = std::min(1e-3, tsub);
         min_dt = std::min(tsub, min_dt);
 
       }
