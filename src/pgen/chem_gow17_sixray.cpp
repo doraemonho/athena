@@ -79,7 +79,7 @@ Real MyTimeStep(MeshBlock *pmb);
 namespace {
   AthenaArray<Real> G0_iang;
   Real G0, cr_rate;
-  Real dfloor, pfloor;
+  Real dfloor, pfloor, yfloor;
   Real cfl_cool_sub, user_dt;
   int nsub_max;
 } //namespace
@@ -163,7 +163,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
   Real float_min = std::numeric_limits<float>::min();
   pfloor = pin->GetOrAddReal("hydro", "pfloor",(1024*(float_min)));  
   dfloor = pin->GetOrAddReal("hydro", "dfloor",(1024*(float_min)));
-
+  yfloor = pin->GetOrAddReal("chemistry", "yfloor", 1e-5);   
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
       for (int i=is; i<=ie; ++i) {
@@ -539,7 +539,6 @@ Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
   const Real small_ = 1024 * std::numeric_limits<float>::min();
   //put floor in species abundance
   Real yf[NSPECIES];
-  Real yfloor = 1e-3;
   for (int ispec=0; ispec<=NSPECIES; ispec++) {
     yf[ispec] = std::max(y[ispec], yfloor);
   }
