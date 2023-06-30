@@ -72,7 +72,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 #endif
 }
 
-EnrollUserTimeStepFunction(CoolingTimeStep);  
+//EnrollUserTimeStepFunction(CoolingTimeStep);  
 cfl_cool_sub = pin->GetOrAddReal("chemistry", "cfl_cool_sub", 0.3);
 nsub_max = pin->GetOrAddInteger("chemistry","nsub_max",1e5);
 
@@ -220,7 +220,7 @@ Real CoolingTimeStep(MeshBlock *pmb){
           Edot = pmb->pscalars->chemnet.Edot(time, y, E);
         }
         //get the sub-cycle dt 
-        tsub = 1e-1 * nsub_max * cfl_cool_sub * GetChemTime(y, ydot, E, Edot);
+        tsub = 1e-1 * cnsub_max * cfl_cool_sub * GetChemTime(y, ydot, E, Edot);
         min_dt = std::min(tsub, min_dt);
 
       }
