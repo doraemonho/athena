@@ -220,7 +220,7 @@ Real CoolingTimeStep(MeshBlock *pmb){
           Edot = pmb->pscalars->chemnet.Edot(time, y, E);
         }
         //get the sub-cycle dt 
-        tsub = 1e-1 * cnsub_max * cfl_cool_sub * GetChemTime(y, ydot, E, Edot);
+        tsub = 1e-1 * nsub_max * cfl_cool_sub * GetChemTime(y, ydot, E, Edot);
         min_dt = std::min(tsub, min_dt);
 
       }
