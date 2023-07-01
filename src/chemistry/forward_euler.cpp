@@ -172,9 +172,11 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
     std::uint64_t nzones =
       static_cast<std::uint64_t> (pmy_block_->GetNumberOfMeshBlockCells());
     double zone_sec = static_cast<double> (nzones) / cpu_time;
-    printf("chemistry ODE integration: ");
-    printf("ncycle = %d, total time in sec = %.2e, zone/sec=%.2e\n",
-        ncycle, cpu_time, Real(nzones)/cpu_time);
+    if (Globals::my_rank == 0){
+      printf("chemistry ODE integration: ");
+      printf("ncycle = %d, total time in sec = %.2e, zone/sec=%.2e\n",
+          ncycle, cpu_time, Real(nzones)/cpu_time);
+    }    
   }
   return;
 }

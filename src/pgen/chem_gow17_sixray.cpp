@@ -519,8 +519,8 @@ Real CoolingTimeStep(MeshBlock *pmb){
         }
         //get the sub-cycle dt 
         tsub = nsub_max * cfl_cool_sub * GetChemTime(y, ydot, E, Edot);
-        // manually choosen timestep 1e-3 dt to stablize the system at the begining of the simulation
-        tsub = std::min(1.5e-3, tsub);
+        // manually choosen timestep 1e-2 dt to stablize the system at the begining of the simulation
+        tsub = std::min( 1e-2, tsub);
         min_dt = std::min(tsub, min_dt);
 
       }
