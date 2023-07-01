@@ -51,6 +51,7 @@ Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
 //Radiation boundary
 namespace {
   Real cfl_cool_sub;
+  Real d_floor;
   int nsub_max;
 } //namespace
 
@@ -75,6 +76,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 //EnrollUserTimeStepFunction(CoolingTimeStep);  
 cfl_cool_sub = pin->GetOrAddReal("chemistry", "cfl_cool_sub", 0.3);
 nsub_max = pin->GetOrAddInteger("chemistry","nsub_max",1e5);
+d_floor = pin->GetOrAddInteger("chemistry","d_floor",1e-4);
 
   return;
 }
@@ -274,6 +276,8 @@ void MeshBlock::UserWorkInLoop() {
           Real& u_m2 = phydro->u(IM2,k,j,i);
           Real& u_m3 = phydro->u(IM3,k,j,i);
           
+          // Check if u_d < d_floor
+          u_d = (u_d > d_floor) ?  u_d : d_floor;
           Real   nH_  = u_d*unit_density_in_nH_;
           Real   ED   = w_p/(g-1.0);
           Real E_ergs = ED * unit_E_in_cgs_ / nH_;
