@@ -212,14 +212,16 @@ Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
 //! \brief advance chemical abundance and energy for tsub
 void IntegrateOneSubstep(Real tsub, Real y[NSPECIES], const Real ydot[NSPECIES],
                          Real &E, const Real Edot) {
+  const Real small_ = 1024 * std::numeric_limits<float>::min();                        
   for (int ispec=0; ispec<=NSPECIES; ispec++) {
     y[ispec] += ydot[ispec] * tsub;
+    if (y[ispec] < small_)
+      y[ispec] = small_;
   }
   if (NON_BAROTROPIC_EOS) {
     E += Edot * tsub;
-    if (E < Efloor){
+    if (E < Efloor)
       E = Efloor;
-    }
   }
   return;
 }
