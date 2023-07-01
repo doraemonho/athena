@@ -101,20 +101,20 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 #endif
 }
 
-  bool is_subcycling = pin->GetOrAddBoolean("chemistry", "subcycling", false);
-  if (is_subcycling){
-#ifdef CVODE
-    std::stringstream msg;
-    msg << "### FATAL ERROR in ProblemGenerator::Chem_gow17_MHD" << std::endl
-        << "user enable both sub-cycling solver and CVODE solver" << std::endl;
-    throw std::runtime_error(msg.str().c_str());
-#endif
-    EnrollUserTimeStepFunction(CoolingTimeStep);
-  }
-
-  user_dt = pin->GetOrAddReal("time", "user_dt", 0.0);
-  if ( user_dt > 0.0 && is_subcycling)
-    EnrollUserTimeStepFunction(MyTimeStep);
+//  bool is_subcycling = pin->GetOrAddBoolean("chemistry", "subcycling", false);
+//  if (is_subcycling){
+//#ifdef CVODE
+//    std::stringstream msg;
+//    msg << "### FATAL ERROR in ProblemGenerator::Chem_gow17_MHD" << std::endl
+//        << "user enable both sub-cycling solver and CVODE solver" << std::endl;
+//    throw std::runtime_error(msg.str().c_str());
+//#endif
+//    EnrollUserTimeStepFunction(CoolingTimeStep);
+//  }
+//
+//  user_dt = pin->GetOrAddReal("time", "user_dt", 0.0);
+//  if ( user_dt > 0.0 && is_subcycling)
+//    EnrollUserTimeStepFunction(MyTimeStep);
 
   //EnrollUserBoundaryFunction(BoundaryFace::inner_x1, SixRayBoundaryInnerX1);
   //EnrollUserBoundaryFunction(BoundaryFace::outer_x1, SixRayBoundaryOuterX1);

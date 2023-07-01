@@ -97,7 +97,8 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
   Real dt_mhd = pmy_block_->pmy_mesh->dt; //MHD timestep
   //subcycling variables
   Real tend, tsub, tnow, tleft;
-  Real icount;
+  Real icount = 0;
+  Real totcount = 0.;
   //loop over all cells
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
@@ -137,6 +138,7 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
           tnow += tsub;
           tleft = tend - tnow;
           icount++;
+          totcount++;
           //check maximum number of steps
           if (icount > nsub_max) {
             std::stringstream msg;
@@ -174,8 +176,8 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
     double zone_sec = static_cast<double> (nzones) / cpu_time;
     if (Globals::my_rank == 0){
       printf("chemistry ODE integration: ");
-      printf("ncycle = %d, total time in sec = %.2e, zone/sec=%.2e\n",
-          ncycle, cpu_time, Real(nzones)/cpu_time);
+      printf("ncycle = %d, total time in sec = %.2e, zone/sec=%.2e, avg it per cell = %.2e\n",
+          ncycle, cpu_time, Real(nzones)/cpu_time, totcount/Real(nzones) );
     }    
   }
   return;
