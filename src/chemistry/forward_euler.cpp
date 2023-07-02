@@ -35,8 +35,8 @@ namespace {
   int nsub_max; //maximum number of substeps
   Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
                    const Real E, const Real Edot);
-  Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
-                   const Real E, const Real Edot);
+  void PrintChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
+                  const Real E, const Real Edot);   
   void IntegrateOneSubstep(Real tsub, Real y[NSPECIES], const Real ydot[NSPECIES],
                            Real &E, const Real Edot);
 } //namespace
