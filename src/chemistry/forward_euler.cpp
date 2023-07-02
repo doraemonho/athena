@@ -52,7 +52,7 @@ ODEWrapper::ODEWrapper(MeshBlock *pmb, ParameterInput *pin) {
   cfl_cool_sub = pin->GetOrAddReal("chemistry","cfl_cool_sub",0.1);
   yfloor = pin->GetOrAddReal("chemistry","yfloor",1e-3);
   Efloor = pin->GetOrAddReal("chemistry","Efloor",1e-3);
-  nsub_max = pin->GetOrAddInteger("chemistry","nsub_max",1e5);
+  nsub_max = pin->GetOrAddInteger("chemistry","maxsteps",1e5);
 }
 
 //----------------------------------------------------------------------------------------
