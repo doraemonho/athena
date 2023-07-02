@@ -35,6 +35,8 @@ namespace {
   int nsub_max; //maximum number of substeps
   Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
                    const Real E, const Real Edot);
+  Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
+                   const Real E, const Real Edot);
   void IntegrateOneSubstep(Real tsub, Real y[NSPECIES], const Real ydot[NSPECIES],
                            Real &E, const Real Edot);
 } //namespace
@@ -139,6 +141,8 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
           tleft = tend - tnow;
           icount++;
           totcount++;
+          if (icount > nsub_max - 1)
+            PrintChemTime(y, ydot, E, Edot);
           //check maximum number of steps
           if (icount > nsub_max) {
             std::stringstream msg;
@@ -226,6 +230,32 @@ void IntegrateOneSubstep(Real tsub, Real y[NSPECIES], const Real ydot[NSPECIES],
       E = Efloor;
   }
   return;
+}
+
+void PrintChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
+                 const Real E, const Real Edot) {
+  const Real small_ = 1024 * std::numeric_limits<float>::min();
+  Real tchem = std::abs( 1.0/small_);
+  //put floor in species abundance
+  Real yf[NSPECIES];
+  if (NSPECIES > 1) {
+    for (int ispec=0; ispec<=NSPECIES; ispec++) {
+      yf[ispec] = std::max(y[ispec], yfloor);
+    }
+    //calculate chemistry timescale
+    tchem = std::abs( yf[0]/(ydot[0] + small_) );
+    printf("y[%d] = %.2e, ydot, t_chem = %.2e, %.2e \n",0, y[0], ydot[0], tchem);
+    for (int ispec=0; ispec<NSPECIES; ispec++) {
+      tchem = std::abs(yf[ispec]/(ydot[ispec]+small_));
+      printf("y[%d] = %.2e, ydot, t_chem = %.2e, %.2e \n", ispec, y[ispec], ydot[ispec], tchem);
+    }
+  }
+
+  if (NON_BAROTROPIC_EOS) {
+    tchem =  std::abs(E/(Edot+small_));
+    printf("E, t_chem = %.2e \n", tchem);
+  }
+  return ;
 }
 
 } //namespace
