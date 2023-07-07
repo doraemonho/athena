@@ -52,9 +52,10 @@ Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
 namespace {
   Real cfl_cool_sub;
   Real d_floor;
+  Real v_max;
   int nsub_max;
+  int sign(Real number);
 } //namespace
-
 
 //========================================================================================
 //! \fn void Mesh::InitUserMeshData(ParameterInput *pin)
@@ -77,6 +78,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 cfl_cool_sub = pin->GetOrAddReal("chemistry", "cfl_cool_sub", 0.3);
 nsub_max = pin->GetOrAddInteger("chemistry","nsub_max",1e5);
 d_floor = pin->GetOrAddInteger("chemistry","d_floor",1e-4);
+v_max = pin->GetOrAddInteger("chemistry","v_max",100.0);
 
   return;
 }
@@ -277,8 +279,24 @@ void MeshBlock::UserWorkInLoop() {
           Real& u_m2 = phydro->u(IM2,k,j,i);
           Real& u_m3 = phydro->u(IM3,k,j,i);
           
-          // Check if u_d < d_floor
-          u_d = (u_d > d_floor) ?  u_d : d_floor;
+
+
+          // Check if u_d < d_floor && if v > vmax 
+          if (u_d  < d_floor){
+            Real u_1,u_2,u_3;
+            u_1 = u_m1/u_d;
+            u_2 = u_m2/u_d;
+            u_3 = u_m3/u_d;
+            u_d  = d_floor;
+            u_m1 = u_d*u_1;
+            u_m2 = u_d*u_2;
+            u_m3 = u_d*u_3;
+          }
+
+          if ( std::abs(u_m1) >  u_d*v_max) u_m1 =  u_d*sign(u_m1)*v_max; 
+          if ( std::abs(u_m2) >  u_d*v_max) u_m2 =  u_d*sign(u_m2)*v_max; 
+          if ( std::abs(u_m3) >  u_d*v_max) u_m3 =  u_d*sign(u_m3)*v_max; 
+
           Real   nH_  = u_d*unit_density_in_nH_;
           Real   ED   = w_p/(g-1.0);
           Real E_ergs = ED * unit_E_in_cgs_ / nH_;
@@ -306,3 +324,9 @@ void MeshBlock::UserWorkInLoop() {
   }
   return;
 }
+
+namespace {
+int sign(Real number) {
+  return (number > 0) - (number < 0);
+}
+} //namespace
