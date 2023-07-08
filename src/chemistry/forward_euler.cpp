@@ -158,6 +158,9 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
               icount = 0;
               tnow = time;
               tend = dt_mhd;
+              for (int ispec=0; ispec<NSPECIES; ispec++)
+                y[ispec] = y0[ispec];
+              E = E0;
               std::cout << "### Warning: the chemistry ODE solver is not converging"
                 << std::endl << " Retry with a smaller CFL number: " << cfl_cool_sub0
                 << std::endl;
