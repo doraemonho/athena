@@ -107,6 +107,7 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
   //subcycling variables
   Real tend, tsub, tnow, tleft;
   Real icount;
+  Real totcount = 0.;
   //loop over all cells
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
@@ -163,9 +164,10 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
           tnow += tsub;
           tleft = tend - tnow;
           icount++;
+          totcount++;
 
-          if (icount > nsub_max - 1)
-            PrintChemTime(y, ydot0, E, Edot0);
+          if (icount == nsub_max - 1)
+          PrintChemTime(y, ydot0, E, Edot0);
           //check maximum number of steps
           if (icount > nsub_max) {
             std::stringstream msg;
@@ -202,9 +204,11 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
     std::uint64_t nzones =
       static_cast<std::uint64_t> (pmy_block_->GetNumberOfMeshBlockCells());
     double zone_sec = static_cast<double> (nzones) / cpu_time;
-    printf("chemistry ODE integration: ");
-    printf("ncycle = %d, total time in sec = %.2e, zone/sec=%.2e\n",
-        ncycle, cpu_time, Real(nzones)/cpu_time);
+    if (Globals::my_rank == 0){
+      printf("chemistry ODE integration: ");
+      printf("ncycle = %d, total time in sec = %.2e, zone/sec=%.2e, avg it per cell = %.2e\n",
+          ncycle, cpu_time, Real(nzones)/cpu_time, totcount/Real(nzones) );
+    }    
   }
   return;
 }
@@ -273,7 +277,7 @@ void IntegrateHalfSubstep(Real tsub, Real y[NSPECIES], const Real ydot[NSPECIES]
   const Real small_ = 1024 * std::numeric_limits<float>::min();
   for (int ispec=0; ispec<NSPECIES; ispec++) {
     y[ispec] += ydot[ispec] * tsub;
-    if (y[ispec] < 0.0)
+    if (y[ispec] < small_)
       y[ispec] = small_;
   }
   if (NON_BAROTROPIC_EOS) {
