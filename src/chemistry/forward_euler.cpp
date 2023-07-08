@@ -154,7 +154,7 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
             PrintChemTime(y, ydot, E, Edot);
             }else{
               retry_flag = false;
-              cfl_cool_sub0/=5.0;
+              cfl_cool_sub0/=10.0;
               icount = 0;
               tnow = time;
               tend = dt_mhd;
