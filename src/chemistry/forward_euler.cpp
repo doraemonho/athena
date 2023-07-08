@@ -103,7 +103,6 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
   Real tend, tsub, tnow, tleft;
   Real icount = 0;
   Real totcount = 0.;
-  Real cfl_cool_sub0 = cfl_cool_sub;
   //loop over all cells
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
@@ -130,6 +129,7 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
         tnow = time;
         tend = time + dt_mhd;
         tleft = dt_mhd;
+        Real cfl_cool_sub0 = cfl_cool_sub;
         bool retry_flag = true;
         while (tnow < tend) {
           //calculate reaction rates
