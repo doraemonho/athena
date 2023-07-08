@@ -36,7 +36,7 @@ namespace {
   Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
                    const Real E, const Real Edot);
   void PrintChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
-                  const Real E, const Real Edot);   
+                 const Real E, const Real Edot); 
   void IntegrateOneSubstep(Real tsub, Real y[NSPECIES], const Real ydot[NSPECIES],
                            Real &E, const Real Edot);
 } //namespace
@@ -141,15 +141,10 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
           tleft = tend - tnow;
           icount++;
           totcount++;
-          if (icount > nsub_max - 1)
-            PrintChemTime(y, ydot, E, Edot);
+
           //check maximum number of steps
           if (icount > nsub_max) {
-            std::stringstream msg;
-            msg << "### FATAL ERROR in function ODEWrapper::Integrate: "
-              << "Maximum number of substeps = " << nsub_max
-              << " exceeded for forward Euler solver." << std::endl;
-            ATHENA_ERROR(msg);
+            PrintChemTime(y, ydot, E, Edot);
           }
         }
         //copy species abundance back to s
@@ -234,6 +229,8 @@ void IntegrateOneSubstep(Real tsub, Real y[NSPECIES], const Real ydot[NSPECIES],
 
 void PrintChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
                  const Real E, const Real Edot) {
+
+  std::stringstream msg;
   const Real small_ = 1024 * std::numeric_limits<float>::min();
   Real tchem = std::abs( 1.0/small_);
   //put floor in species abundance
@@ -244,17 +241,20 @@ void PrintChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
     }
     //calculate chemistry timescale
     tchem = std::abs( yf[0]/(ydot[0] + small_) );
-    printf("y[%d] = %.2e, ydot, t_chem = %.2e, %.2e \n",0, y[0], ydot[0], tchem);
+    msg << "y["<< 0 << "] = " << y[0] << ", ydot, t_chem = "  << ydot[0] << "," << tchem << std::endl;
     for (int ispec=0; ispec<NSPECIES; ispec++) {
       tchem = std::abs(yf[ispec]/(ydot[ispec]+small_));
-      printf("y[%d] = %.2e, ydot, t_chem = %.2e, %.2e \n", ispec, y[ispec], ydot[ispec], tchem);
+      msg << "y["<< ispec << "] = " << y[ispec] << ", ydot, t_chem = "  << ydot[ispec] << "," << tchem << std::endl;
     }
   }
 
   if (NON_BAROTROPIC_EOS) {
     tchem =  std::abs(E/(Edot+small_));
-    printf("E, t_chem = %.2e \n", tchem);
+    msg << " E, t_chem = "  << E << "," << tchem << std::endl;
   }
+  msg << "Maximum number of substeps = " << nsub_max
+  << " exceeded for forward Euler solver." << std::endl;
+  ATHENA_ERROR(msg);
   return ;
 }
 
