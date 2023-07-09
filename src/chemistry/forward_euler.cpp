@@ -213,7 +213,7 @@ Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
   const Real small_ = 1024 * std::numeric_limits<float>::min();
   //put floor in species abundance
   Real yf[NSPECIES];
-  for (int ispec=0; ispec<=NSPECIES; ispec++) {
+  for (int ispec=0; ispec<NSPECIES; ispec++) {
     yf[ispec] = std::max(y[ispec], yfloor);
   }
   //calculate chemistry timescale
@@ -234,7 +234,7 @@ Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
 void IntegrateOneSubstep(Real tsub, Real y[NSPECIES], const Real ydot[NSPECIES],
                          Real &E, const Real Edot) {
   const Real small_ = 1024 * std::numeric_limits<float>::min();                        
-  for (int ispec=0; ispec<=NSPECIES; ispec++) {
+  for (int ispec=0; ispec<NSPECIES; ispec++) {
     y[ispec] += ydot[ispec] * tsub;
     if (y[ispec] < small_)
       y[ispec] = small_;
@@ -259,7 +259,7 @@ void PrintChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
   //put floor in species abundance
   Real yf[NSPECIES];
   if (NSPECIES > 1) {
-    for (int ispec=0; ispec<=NSPECIES; ispec++) {
+    for (int ispec=0; ispec<NSPECIES; ispec++) {
       yf[ispec] = std::max(y[ispec], yfloor);
     }
     //calculate chemistry timescale
