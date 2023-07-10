@@ -30,7 +30,8 @@
 
 namespace {
   Real cfl_cool_sub; //cfl number for subcycling
-  Real yfloor; //species abundance floor for calculating the cooling time
+  Real yfloor0; //species abundance floor for calculating the cooling time
+  Real yfloor[NSPECIES];  // user defined species abundance floor for the integration
   Real Efloor;
   int nsub_max; //maximum number of substeps
   Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
@@ -52,9 +53,14 @@ ODEWrapper::ODEWrapper(MeshBlock *pmb, ParameterInput *pin) {
   }
   output_zone_sec_ = pin->GetOrAddBoolean("chemistry", "output_zone_sec", false);
   cfl_cool_sub = pin->GetOrAddReal("chemistry","cfl_cool_sub",0.1);
-  yfloor = pin->GetOrAddReal("chemistry","yfloor",1e-3);
+  yfloor0 = pin->GetOrAddReal("chemistry","yfloor", 1024*std::numeric_limits<float>::min());
   Efloor = pin->GetOrAddReal("chemistry","Efloor",1e-3);
   nsub_max = pin->GetOrAddInteger("chemistry","maxsteps",1e5);
+  for (int i=0; i<NSPECIES; ++i) {
+    yfloor[i] = pin->GetOrAddReal("dust", "yfloor_" + std::to_string(i),yfloor0);
+    if (yfloor[i] != yfloor0)
+      std::cout << "user defined yfloor[" << i << "] = " << yfloor[i] << std::endl;
+  }
 }
 
 //----------------------------------------------------------------------------------------
@@ -214,7 +220,7 @@ Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
   //put floor in species abundance
   Real yf[NSPECIES];
   for (int ispec=0; ispec<NSPECIES; ispec++) {
-    yf[ispec] = std::max(y[ispec], yfloor);
+    yf[ispec] = std::max(y[ispec], yfloor[ispec]);
   }
   //calculate chemistry timescale
   Real tchem = std::abs( yf[0]/(ydot[0] + small_) );
@@ -260,7 +266,7 @@ void PrintChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
   Real yf[NSPECIES];
   if (NSPECIES > 1) {
     for (int ispec=0; ispec<NSPECIES; ispec++) {
-      yf[ispec] = std::max(y[ispec], yfloor);
+      yf[ispec] = std::max(y[ispec], yfloor[ispec]);
     }
     //calculate chemistry timescale
     tchem = std::abs( yf[0]/(ydot[0] + small_) );
