@@ -57,7 +57,7 @@ ODEWrapper::ODEWrapper(MeshBlock *pmb, ParameterInput *pin) {
   Efloor = pin->GetOrAddReal("chemistry","Efloor",1e-3);
   nsub_max = pin->GetOrAddInteger("chemistry","maxsteps",1e5);
   for (int i=0; i<NSPECIES; ++i) {
-    yfloor[i] = pin->GetOrAddReal("dust", "yfloor_" + std::to_string(i),yfloor0);
+    yfloor[i] = pin->GetOrAddReal("chemistry", "yfloor_" + std::to_string(i),yfloor0);
     if (yfloor[i] != yfloor0)
       std::cout << "user defined yfloor[" << i << "] = " << yfloor[i] << std::endl;
   }
