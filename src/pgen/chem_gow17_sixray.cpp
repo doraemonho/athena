@@ -79,9 +79,10 @@ Real MyTimeStep(MeshBlock *pmb);
 namespace {
   AthenaArray<Real> G0_iang;
   Real G0, cr_rate;
-  Real dfloor, pfloor, yfloor;
+  Real dfloor, pfloor, yfloor, Tfloor, vmax;
   Real cfl_cool_sub, user_dt;
   int nsub_max;
+  int sign(Real number);
 } //namespace
 
 //========================================================================================
@@ -133,6 +134,8 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
   cr_rate = pin->GetOrAddReal("chem_radiation", "CR", 2e-16);
   cfl_cool_sub = pin->GetOrAddReal("chemistry", "cfl_cool_sub", 0.5);
   nsub_max = pin->GetOrAddInteger("chemistry","nsub_max",1e5);
+
+
   return;
 }
 
@@ -163,7 +166,9 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
   Real float_min = std::numeric_limits<float>::min();
   pfloor = pin->GetOrAddReal("hydro", "pfloor",(1024*(float_min)));  
   dfloor = pin->GetOrAddReal("hydro", "dfloor",(1024*(float_min)));
-  yfloor = pin->GetOrAddReal("chemistry", "yfloor", 1e-5);   
+  Tfloor = pin->GetOrAddInteger("hydro","Tfloor",20.0);
+  yfloor = pin->GetOrAddReal("chemistry", "yfloor", 1e-5);
+  vmax   = pin->GetOrAddReal("hydro", "vmax", 100.0); 
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
       for (int i=is; i<=ie; ++i) {
@@ -270,7 +275,7 @@ void MeshBlock::UserWorkInLoop() {
                            * unit_vel_in_cms_ * unit_vel_in_cms_;
   const Real unit_time_in_s_ = unit_length_in_cm_/unit_vel_in_cms_;
   const Real  g =  peos->GetGamma();
-  const Real Tfloor = 20.0;
+
   //set density and pressure floors
   for (int k=ks; k<=ke; k++) {
     for (int j=js; j<=je; j++) {
@@ -282,6 +287,23 @@ void MeshBlock::UserWorkInLoop() {
           Real& u_m2 = phydro->u(IM2,k,j,i);
           Real& u_m3 = phydro->u(IM3,k,j,i);
           
+          // Check if u_d < d_floor && if v > vmax 
+          if (u_d  < dfloor){
+            Real u_1,u_2,u_3;
+            u_1 = u_m1/ u_d;
+            u_2 = u_m2/ u_d;
+            u_3 = u_m3/ u_d;
+            u_d  = dfloor;
+            u_m1 = u_d*u_1;
+            u_m2 = u_d*u_2;
+            u_m3 = u_d*u_3;
+          }
+          
+          if ( std::abs(u_m1) >  u_d*vmax) u_m1 =  u_d*sign(u_m1)*vmax; 
+          if ( std::abs(u_m2) >  u_d*vmax) u_m2 =  u_d*sign(u_m2)*vmax; 
+          if ( std::abs(u_m3) >  u_d*vmax) u_m3 =  u_d*sign(u_m3)*vmax; 
+
+
           Real   nH_  = u_d*unit_density_in_nH_;
           Real   ED   = w_p/(g-1.0);
           Real E_ergs = ED * unit_E_in_cgs_ / nH_;
@@ -560,3 +582,8 @@ Real MyTimeStep(MeshBlock *pmb)
   Real min_user_dt = user_dt;
   return min_user_dt;
 }
+namespace {
+int sign(Real number) {
+  return (number > 0) - (number < 0);
+}
+} //namespace
