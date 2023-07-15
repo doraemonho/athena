@@ -79,7 +79,7 @@ Real MyTimeStep(MeshBlock *pmb);
 namespace {
   AthenaArray<Real> G0_iang;
   Real G0, cr_rate;
-  Real dfloor, pfloor, yfloor, Tfloor, vmax;
+  Real dfloor, pfloor, yfloor, Tfloor, vmax, Tmax;
   Real cfl_cool_sub, user_dt;
   int nsub_max;
   int sign(Real number);
@@ -169,6 +169,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
   Tfloor = pin->GetOrAddInteger("hydro","Tfloor",20.0);
   yfloor = pin->GetOrAddReal("chemistry", "yfloor", 1e-5);
   vmax   = pin->GetOrAddReal("hydro", "vmax", 100.0); 
+  Tmax = pin->GetOrAddInteger("hydro","Tmax", 2e4);
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
       for (int i=is; i<=ie; ++i) {
@@ -275,7 +276,7 @@ void MeshBlock::UserWorkInLoop() {
                            * unit_vel_in_cms_ * unit_vel_in_cms_;
   const Real unit_time_in_s_ = unit_length_in_cm_/unit_vel_in_cms_;
   const Real  g =  peos->GetGamma();
-  const Real dfloor = 1e-4; 
+  const Real dfloor = 1e-3; 
   //set density and pressure floors
   for (int k=ks; k<=ke; k++) {
     for (int j=js; j<=je; j++) {
@@ -309,12 +310,17 @@ void MeshBlock::UserWorkInLoop() {
           Real E_ergs = ED * unit_E_in_cgs_ / nH_;
           Real     T  =  E_ergs / (1.5*1.381e-16);
 
-          Real pfloor = Tfloor* (1.5*1.381e-16) * nH_/unit_E_in_cgs_*(g - 1.0);
-          w_p = (T > Tfloor) ?  w_p : pfloor;
+          if (T < Tfloor){
+            Real pfloor = Tfloor* (1.5*1.381e-16) * nH_/unit_E_in_cgs_*(g - 1.0);
+            w_p = pfloor;
+          }else if (T > Tmax){
+            Real pmax = pmax* (1.5*1.381e-16) * nH_/unit_E_in_cgs_*(g - 1.0);
+            w_p = pmax;
+          }
+
           Real di = 1.0/u_d;
           Real ke = 0.5*di*(SQR(u_m1) + SQR(u_m2) + SQR(u_m3));
 
-            
 #if !MAGNETIC_FIELDS_ENABLED  // Hydro:
           u_e = w_p/(g-1.0)+ke;
 #else  // MHD:
