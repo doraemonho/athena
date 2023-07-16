@@ -277,6 +277,8 @@ void MeshBlock::UserWorkInLoop() {
   const Real unit_time_in_s_ = unit_length_in_cm_/unit_vel_in_cms_;
   const Real  g =  peos->GetGamma();
   const Real dfloor = 1e-3; 
+  const Real   vmax = 100.0;
+  const Real   Tmax = 5e4; 
   //set density and pressure floors
   for (int k=ks; k<=ke; k++) {
     for (int j=js; j<=je; j++) {
@@ -303,7 +305,6 @@ void MeshBlock::UserWorkInLoop() {
           if ( std::abs(u_m1) >  u_d*vmax) u_m1 =  u_d*sign(u_m1)*vmax; 
           if ( std::abs(u_m2) >  u_d*vmax) u_m2 =  u_d*sign(u_m2)*vmax; 
           if ( std::abs(u_m3) >  u_d*vmax) u_m3 =  u_d*sign(u_m3)*vmax; 
-
 
           Real   nH_  = u_d*unit_density_in_nH_;
           Real   ED   = w_p/(g-1.0);
