@@ -314,7 +314,7 @@ void MeshBlock::UserWorkInLoop() {
             Real pfloor = Tfloor* (1.5*1.381e-16) * nH_/unit_E_in_cgs_*(g - 1.0);
             w_p = pfloor;
           }else if (T > Tmax){
-            Real pmax = pmax* (1.5*1.381e-16) * nH_/unit_E_in_cgs_*(g - 1.0);
+            Real pmax = Tmax* (1.5*1.381e-16) * nH_/unit_E_in_cgs_*(g - 1.0);
             w_p = pmax;
           }
 
