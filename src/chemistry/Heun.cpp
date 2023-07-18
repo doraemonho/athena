@@ -95,6 +95,7 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
   //chemical species and rates
   Real  y[NSPECIES];
   Real y1[NSPECIES];
+  Real y0[NSPECIES];
   Real ydot0[NSPECIES];
   Real ydot1[NSPECIES];
   //internal energy and rates
@@ -109,6 +110,7 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
   Real tend, tsub, tnow, tleft;
   Real icount;
   Real totcount = 0.;
+
   //loop over all cells
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
@@ -116,7 +118,7 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
         pmy_spec_->chemnet.InitializeNextStep(k, j, i);
         //copy species abundance
         for (int ispec=0; ispec<=NSPECIES; ispec++) {
-          y[ispec] = y1[ispec] = pmy_spec_->s(ispec,k,j,i)/u(IDN,k,j,i);
+          y[ispec] = y0[ispec] = y1[ispec] = pmy_spec_->s(ispec,k,j,i)/u(IDN,k,j,i);
         }
         //assign internal energy, if not isothermal eos
         if (NON_BAROTROPIC_EOS) {
@@ -134,8 +136,9 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
         tnow = time;
         tend = time + dt_mhd;
         tleft = dt_mhd;
+        bool retry_flag = true;
+        Real cfl_cool_sub0 = cfl_cool_sub;
         while (tnow < tend) {
-          
           // half step calcution using forward Euler method
           //calculate reaction rates
           pmy_spec_->chemnet.RHS(time, y, E, ydot0);
@@ -144,7 +147,7 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
             Edot0 = pmy_spec_->chemnet.Edot(time, y, E);
           }
           //get the sub-cycle dt 
-          tsub = cfl_cool_sub * GetChemTime(y, ydot0, E, Edot0);
+          tsub = cfl_cool_sub0 * GetChemTime(y, ydot0, E, Edot0);
           tsub = std::min(tsub, tleft);
           
           //advance half step
@@ -167,10 +170,26 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
           icount++;
           totcount++;
 
+          //check maximum number of steps && retry if necessary
+          if (icount > nsub_max){
+            retry_flag = false;
+            cfl_cool_sub0/=10.0;
+            icount = 0;
+            tnow = time;
+            tend = dt_mhd;
+            for (int ispec=0; ispec<=NSPECIES; ispec++)
+              y[ispec] = y1[ispec] = y0[ispec];
+            E = E1 = E0;
+            std::cout << "### Warning: the chemistry ODE solver is not converging"
+              << std::endl << " Retry with a smaller CFL number: " << cfl_cool_sub0
+              << std::endl;
+          }
+
+
           if (icount == nsub_max - 1)
           PrintChemTime(y, ydot0, E, Edot0);
           //check maximum number of steps
-          if (icount > nsub_max) {
+          if (icount > nsub_max && !retry_flag) {
             std::stringstream msg;
             msg << "### FATAL ERROR in function ODEWrapper::Integrate: "
               << "Maximum number of substeps = " << nsub_max 
@@ -232,7 +251,7 @@ Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
     }
     //calculate chemistry timescale
     tchem = std::abs( yf[0]/(ydot[0] + small_) );
-    for (int ispec=1; ispec<NSPECIES; ispec++) {
+    for (int ispec=1; ispec<=NSPECIES; ispec++) {
       tchem = std::min( tchem, std::abs(yf[ispec]/(ydot[ispec]+small_)) );
     }
   }
@@ -256,7 +275,7 @@ void PrintChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
     //calculate chemistry timescale
     tchem = std::abs( yf[0]/(ydot[0] + small_) );
     printf("y[%d] = %.2e, ydot, t_chem = %.2e, %.2e \n",0, y[0], ydot[0], tchem);
-    for (int ispec=0; ispec<NSPECIES; ispec++) {
+    for (int ispec=0; ispec<=NSPECIES; ispec++) {
       tchem = std::abs(yf[ispec]/(ydot[ispec]+small_));
       printf("t_chem = %.2e \n", tchem);
     }
