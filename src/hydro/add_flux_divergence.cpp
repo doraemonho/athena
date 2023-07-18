@@ -45,8 +45,7 @@ void Hydro::AddFluxDivergence(const Real wght, AthenaArray<Real> &u_out,  FaceFi
   int ie = pmb->ie; int je = pmb->je; int ke = pmb->ke;
   AthenaArray<Real> &x1area = x1face_area_, &x2area = x2face_area_,
                  &x2area_p1 = x2face_area_p1_, &x3area = x3face_area_,
-                 &x3area_p1 = x3face_area_p1_, &vol = cell_volume_, &dflx = dflx_;
-
+                 &x3area_p1 = x3face_area_p1_, &vol = cell_volume_, &dflx3D = dflx3D_;
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
       // calculate x1-flux divergence
@@ -54,7 +53,7 @@ void Hydro::AddFluxDivergence(const Real wght, AthenaArray<Real> &u_out,  FaceFi
       for (int n=0; n<NHYDRO; ++n) {
 #pragma omp simd
         for (int i=is; i<=ie; ++i) {
-          dflx(n,i) = (x1area(i+1)*x1flux(n,k,j,i+1) - x1area(i)*x1flux(n,k,j,i));
+          dflx3D(n,k,j,i) = (x1area(i+1)*x1flux(n,k,j,i+1) - x1area(i)*x1flux(n,k,j,i));
         }
       }
 
@@ -65,7 +64,7 @@ void Hydro::AddFluxDivergence(const Real wght, AthenaArray<Real> &u_out,  FaceFi
         for (int n=0; n<NHYDRO; ++n) {
 #pragma omp simd
           for (int i=is; i<=ie; ++i) {
-            dflx(n,i) += (x2area_p1(i)*x2flux(n,k,j+1,i) - x2area(i)*x2flux(n,k,j,i));
+            dflx3D(n,k,j,i) += (x2area_p1(i)*x2flux(n,k,j+1,i) - x2area(i)*x2flux(n,k,j,i));
           }
         }
       }
@@ -77,46 +76,93 @@ void Hydro::AddFluxDivergence(const Real wght, AthenaArray<Real> &u_out,  FaceFi
         for (int n=0; n<NHYDRO; ++n) {
 #pragma omp simd
           for (int i=is; i<=ie; ++i) {
-            dflx(n,i) += (x3area_p1(i)*x3flux(n,k+1,j,i) - x3area(i)*x3flux(n,k,j,i));
+            dflx3D(n,k,j,i) += (x3area_p1(i)*x3flux(n,k+1,j,i) - x3area(i)*x3flux(n,k,j,i));
           }
         }
       }
-
+    }
+  }
+  bool is_first_order = false;
+  for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
       // check if density/pressure are negative and apply the first order flux correction
       pmb->pcoord->CellVolume(k, j, is, ie, vol);
-#pragma omp simd
       for (int i=is; i<=ie; ++i) {
-        Real u_d = u_out(IDN,k,j,i) - wght*dflx(IDN,i)/vol(i);
-        Real u_e = u_out(IEN,k,j,i) - wght*dflx(IEN,i)/vol(i);
-        Real u_m1 = u_out(IM1,k,j,i) - wght*dflx(IM1,i)/vol(i);
-        Real u_m2 = u_out(IM2,k,j,i) - wght*dflx(IM2,i)/vol(i);
-        Real u_m3 = u_out(IM3,k,j,i) - wght*dflx(IM3,i)/vol(i);
+        Real &flx_IDN = dflx3D(IDN,k,j,i);
+        Real &flx_IEN = dflx3D(IEN,k,j,i);
+        Real &flx_IM1 = dflx3D(IM1,k,j,i);
+        Real &flx_IM2 = dflx3D(IM2,k,j,i);
+        Real &flx_IM3 = dflx3D(IM3,k,j,i);
+        
+        Real u_d  = u_out(IDN,k,j,i) - wght*flx_IDN/vol(i);
+        Real u_e  = u_out(IEN,k,j,i) - wght*flx_IEN/vol(i);
+        Real u_m1 = u_out(IM1,k,j,i) - wght*flx_IM1/vol(i);
+        Real u_m2 = u_out(IM2,k,j,i) - wght*flx_IM2/vol(i);
+        Real u_m3 = u_out(IM3,k,j,i) - wght*flx_IM3/vol(i);
         Real w_p = (g-1.0)*(u_e - 0.5*(SQR(u_m1) + SQR(u_m2) + SQR(u_m3))/u_d);
-#if MAGNETIC_FIELDS_ENABLED 
-        Real me =0.5*0.25*( SQR(b.x1f(k,j,i) + b.x1f(k,j,i+1))
-                         +  SQR(b.x2f(k,j,i) + b.x2f(k,j+1,i))
-                         +  SQR(b.x3f(k,j,i) + b.x3f(k+1,j,i)));
-        w_p -= (g-1.0)*me;
-#endif
-        if ( u_d < 0.0 || w_p < 0.0 ){
+        if ( u_d < 0.0 || w_p < 0.0 || std::abs(dflx3D(IEN,k,j,i)/vol(i)*wght)>1e5 || std::abs(dflx3D(IDN,k,j,i)/vol(i)*wght)>1e5 ||
+    std::abs(dflx3D(IM1,k,j,i)/vol(i)*wght)>1e5 || std::abs(dflx3D(IM2,k,j,i)/vol(i)*wght)>1e5 || std::abs(dflx3D(IM3,k,j,i)/vol(i)*wght)>1e5     ){
+          //std::cout<<"-----------------------------------------------------"<<std::endl;
+          //std::cout<<"Enter Flux Correction"<<std::endl;
+          //printf("Before : u_d = %e, u_e = %e\n", u_out(IDN,k,j,i), u_out(IEN,k,j,i));
+          //printf("Before : fld = %e, fle = %e\n", wght*dflx3D(IDN,k,j,i)/vol(i), wght*dflx3D(IEN,k,j,i)/vol(i));
           FirstOrderFluxes( w, b, bcc, i-1, j-1, k-1, i+1, j+1, k+1);
-          for (int n=0; n<NHYDRO; ++n) {
-            dflx(n,i) = (x1area(i+1)*x1flux(n,k,j,i+1) - x1area(i)*x1flux(n,k,j,i));
-            if (pmb->block_size.nx2 > 1)
-              dflx(n,i) += (x2area_p1(i)*x2flux(n,k,j+1,i) - x2area(i)*x2flux(n,k,j,i));
-            if (pmb->block_size.nx3 > 1)
-              dflx(n,i) += (x3area_p1(i)*x3flux(n,k+1,j,i) - x3area(i)*x3flux(n,k,j,i));
-          }
-        } 
-      }
 
+          //for (int kk=k; kk<=k+1; ++kk) {
+          //  for (int jj=j; jj<=j+1; ++jj) {
+          //    for (int ii=i; ii<=i+1; ++ii) {
+          //      printf("x1flux(IEN,%d,%d,%d) = %e, x2flux(IEN,%d,%d,%d) = %e, x3flux(IEN,%d,%d,%d) = %e \n",
+          //                        ii,jj,kk,x1flux(IEN,kk,jj,ii),ii,jj,kk,x2flux(IEN,kk,jj,ii),ii,jj,kk,x3flux(IEN,kk,jj,ii));
+          //      printf("before : u_d(%d,%d,%d) = %e, u_e = %e\n", ii,jj,kk, u_out(IDN,kk,jj,ii), u_out(IEN,kk,jj,ii));
+          //      printf("before : im1(%d,%d,%d) = %e, im2 = %e, im3 = %e \n", ii,jj,kk, u_out(IM1,kk,jj,ii), u_out(IM2,kk,jj,ii),  u_out(IM3,kk,jj,ii));
+          //      printf("before : fld(%d,%d,%d) = %e, fle = %e\n", ii,jj,kk, wght*dflx3D(IDN,kk,jj,ii)/vol(i), wght*dflx3D(IEN,kk,jj,ii)/vol(ii));
+          //    }
+          //  }
+          //}
+
+          for (int n=0; n<NHYDRO; ++n) {
+            dflx3D(n,k,j,i)  = (x1area(i+1) *x1flux(n,k,j,i+1) - x1area(i)*x1flux(n,k,j,i));
+            dflx3D(n,k,j,i) += (x2area_p1(i)*x2flux(n,k,j+1,i) - x2area(i)*x2flux(n,k,j,i));
+            dflx3D(n,k,j,i) += (x3area_p1(i)*x3flux(n,k+1,j,i) - x3area(i)*x3flux(n,k,j,i));
+          }
+
+          u_d  = u_out(IDN,k,j,i) - wght*dflx3D(IDN,k,j,i)/vol(i);
+          u_e  = u_out(IEN,k,j,i) - wght*dflx3D(IEN,k,j,i)/vol(i);
+          u_m1 = u_out(IM1,k,j,i) - wght*dflx3D(IM1,k,j,i)/vol(i);
+          u_m2 = u_out(IM2,k,j,i) - wght*dflx3D(IM2,k,j,i)/vol(i);
+          u_m3 = u_out(IM3,k,j,i) - wght*dflx3D(IM3,k,j,i)/vol(i);
+          //printf("After : fld = %e, fle = %e\n", wght*dflx3D(IDN,k,j,i)/vol(i), wght*dflx3D(IEN,k,j,i)/vol(i));
+          //printf("After : u_d = %e, u_e = %e\n", u_d, u_e);
+        }
+      }
+    }
+  }
+  for (int k=ks; k<=ke; ++k) {
+    for (int j=js; j<=je; ++j) {
       // update conserved variables
       pmb->pcoord->CellVolume(k, j, is, ie, vol);
       for (int n=0; n<NHYDRO; ++n) {
 #pragma omp simd
         for (int i=is; i<=ie; ++i) {
-          u_out(n,k,j,i) -= wght*dflx(n,i)/vol(i);
+          u_out(n,k,j,i) -= wght*dflx3D(n,k,j,i)/vol(i); 
         }
+      }
+      for (int i=is; i<=ie; ++i) {
+        if ( u_out(IDN,k,j,i) < 0 || u_out(IEN,k,j,i) < 0 || std::abs(dflx3D(IEN,k,j,i)/vol(i)*wght)>1e5 || std::abs(dflx3D(IDN,k,j,i)/vol(i)*wght)>1e5 ){
+          printf("!!!!!!!!!!!Warning : u_d = %e, u_e = %e\n", u_out(IDN,k,j,i), u_out(IEN,k,j,i));
+          for (int kk=k-1; kk<=k+1; ++kk) {
+            for (int jj=j-1; jj<=j+1; ++jj) {
+              for (int ii=i-1; ii<=i+1; ++ii) {
+                //printf("x1flux(IEN,%d,%d,%d) = %e, x2flux(IEN,%d,%d,%d) = %e, x3flux(IEN,%d,%d,%d) = %e \n",
+                //                  ii,jj,kk,x1flux(IEN,k,j,i),ii,jj,kk,x2flux(IEN,k,j,i),ii,jj,kk,x3flux(IEN,k,j,i));
+                //printf("before : u_d(%d,%d,%d) = %e, u_e = %e\n", ii,jj,kk, u_out(IDN,k,j,i), u_out(IEN,k,j,i));
+                //printf("before : im1(%d,%d,%d) = %e, im2 = %e, im3 = %e \n", ii,jj,kk, u_out(IM1,k,j,i), u_out(IM2,k,j,i),  u_out(IM3,k,j,i));
+                //printf("before : fld(%d,%d,%d) = %e, fle = %e\n", ii,jj,kk, wght*dflx(IDN,i)/vol(i), wght*dflx(IEN,i)/vol(i));
+              }
+            }
+          }
+        }
+
       }
     }
   }

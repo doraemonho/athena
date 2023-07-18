@@ -103,6 +103,7 @@ class Hydro {
   // 2D
   AthenaArray<Real> wl_, wr_, wlb_;
   AthenaArray<Real> dflx_;
+  AthenaArray<Real> dflx3D_;
   AthenaArray<Real> bb_normal_;    // normal magnetic field, for (SR/GR)MHD
   AthenaArray<Real> lambdas_p_l_;  // most positive wavespeeds in left state
   AthenaArray<Real> lambdas_m_l_;  // most negative wavespeeds in left state

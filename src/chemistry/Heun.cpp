@@ -100,6 +100,7 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
   //internal energy and rates
   Real  E = 0.; 
   Real E1 = 0.;
+  Real E0 = 0.;
   Real Edot0 = 0.;
   Real Edot1 = 0.;
   Real time = pmy_block_->pmy_mesh->time; //code time
@@ -126,7 +127,7 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
             E -= 0.5*(
                 SQR(bcc(IB1,k,j,i)) + SQR(bcc(IB2,k,j,i)) + SQR(bcc(IB3,k,j,i)) );
           }
-          E1 = E;
+          E1 = E0 = E;
         }
         //subcycling
         icount = 0;
@@ -173,7 +174,7 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
             std::stringstream msg;
             msg << "### FATAL ERROR in function ODEWrapper::Integrate: "
               << "Maximum number of substeps = " << nsub_max 
-              << ", tnow = "  << tnow << ", tleft = "  << tleft << ", tsub = " << tsub << "E = " << E << "y[0] = " << y[0] 
+              << ", tnow = "  << tnow << ", tleft = "  << tleft << ", tsub = " << tsub << "E = " << E0 << "d = " << u(IDN,k,j,i)
               << " exceeded for Huan solver." << std::endl;
             ATHENA_ERROR(msg);
           }
@@ -257,13 +258,13 @@ void PrintChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
     printf("y[%d] = %.2e, ydot, t_chem = %.2e, %.2e \n",0, y[0], ydot[0], tchem);
     for (int ispec=0; ispec<NSPECIES; ispec++) {
       tchem = std::abs(yf[ispec]/(ydot[ispec]+small_));
-      printf("y[%d] = %.2e, ydot, t_chem = %.2e, %.2e \n", ispec, y[ispec], ydot[ispec], tchem);
+      printf("t_chem = %.2e \n", tchem);
     }
   }
 
   if (NON_BAROTROPIC_EOS) {
     tchem =  std::abs(E/(Edot+small_));
-    printf("E, t_chem = %.2e \n", tchem);
+    printf("E, d, t_chem = %.2e, %.2e, %.2e \n", E, tchem);
   }
   return ;
 }

@@ -281,21 +281,21 @@ void MeshBlock::UserWorkInLoop() {
           
 
 
-          // Check if u_d < d_floor && if v > vmax 
-          if (u_d  < d_floor){
-            Real u_1,u_2,u_3;
-            u_1 = u_m1/ u_d;
-            u_2 = u_m2/ u_d;
-            u_3 = u_m3/ u_d;
-            u_d  = d_floor;
-            u_m1 = u_d*u_1;
-            u_m2 = u_d*u_2;
-            u_m3 = u_d*u_3;
-          }
+          //// Check if u_d < d_floor && if v > vmax 
+          //if (u_d  < d_floor){
+          //  Real u_1,u_2,u_3;
+          //  u_1 = u_m1/ u_d;
+          //  u_2 = u_m2/ u_d;
+          //  u_3 = u_m3/ u_d;
+          //  u_d  = d_floor;
+          //  u_m1 = u_d*u_1;
+          //  u_m2 = u_d*u_2;
+          //  u_m3 = u_d*u_3;
+          //}
 
-          if ( std::abs(u_m1) >  u_d*v_max) u_m1 =  u_d*sign(u_m1)*v_max; 
-          if ( std::abs(u_m2) >  u_d*v_max) u_m2 =  u_d*sign(u_m2)*v_max; 
-          if ( std::abs(u_m3) >  u_d*v_max) u_m3 =  u_d*sign(u_m3)*v_max; 
+          //if ( std::abs(u_m1) >  u_d*v_max) u_m1 =  u_d*sign(u_m1)*v_max; 
+          //if ( std::abs(u_m2) >  u_d*v_max) u_m2 =  u_d*sign(u_m2)*v_max; 
+          //if ( std::abs(u_m3) >  u_d*v_max) u_m3 =  u_d*sign(u_m3)*v_max; 
 
           Real   nH_  = u_d*unit_density_in_nH_;
           Real   ED   = w_p/(g-1.0);
@@ -303,9 +303,9 @@ void MeshBlock::UserWorkInLoop() {
           Real     T  =  E_ergs / (1.5*1.381e-16);
 
           Real pfloor = Tfloor* (1.5*1.381e-16) * nH_/unit_E_in_cgs_*(g - 1.0);
-          Real pmax   =   Tmax* (1.5*1.381e-16) * nH_/unit_E_in_cgs_*(g - 1.0);
+          //Real pmax   =   Tmax* (1.5*1.381e-16) * nH_/unit_E_in_cgs_*(g - 1.0);
           w_p = (T > Tfloor) ?  w_p : pfloor;
-          w_p = (T > Tmax) ?   pmax : w_p;
+          //w_p = (T > Tmax) ?   pmax : w_p;
           Real di = 1.0/u_d;
           Real ke = 0.5*di*(SQR(u_m1) + SQR(u_m2) + SQR(u_m3));
 
