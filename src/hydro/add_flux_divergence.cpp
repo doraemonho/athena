@@ -148,7 +148,7 @@ void Hydro::AddFluxDivergence(const Real wght, AthenaArray<Real> &u_out,  FaceFi
         }
       }
       for (int i=is; i<=ie; ++i) {
-        if ( u_out(IDN,k,j,i) < 0 || u_out(IEN,k,j,i) < 0 || std::abs(dflx3D(IEN,k,j,i)/vol(i)*wght)>1e5 || std::abs(dflx3D(IDN,k,j,i)/vol(i)*wght)>1e5 ){
+        if ( u_out(IDN,k,j,i) < 0 || u_out(IEN,k,j,i) < 0 || std::abs(dflx3D(IEN,k,j,i)/vol(i)*wght)>1e8 || std::abs(dflx3D(IDN,k,j,i)/vol(i)*wght)>1e8 ){
           printf("!!!!!!!!!!!Warning : u_d = %e, u_e = %e\n", u_out(IDN,k,j,i), u_out(IEN,k,j,i));
           for (int kk=k-1; kk<=k+1; ++kk) {
             for (int jj=j-1; jj<=j+1; ++jj) {
