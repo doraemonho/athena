@@ -64,7 +64,8 @@ class Hydro {
 
   // functions
   void NewBlockTimeStep();    // computes new timestep on a MeshBlock
-  void AddFluxDivergence(const Real wght, AthenaArray<Real> &u_out, FaceField &b, AthenaArray<Real> &bcc);
+  void AddFluxDivergence(const Real wght, AthenaArray<Real> &u_out, 
+                         FaceField &b, AthenaArray<Real> &bcc, Real g);
   void AddFluxDivergence_STS(const Real wght, int stage,
                              AthenaArray<Real> &u_out,
                              AthenaArray<Real> &fl_div_out,
