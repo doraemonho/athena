@@ -64,14 +64,17 @@ class Hydro {
 
   // functions
   void NewBlockTimeStep();    // computes new timestep on a MeshBlock
-  void AddFluxDivergence(const Real wght, AthenaArray<Real> &u_out);
+  void AddFluxDivergence(const Real wght, AthenaArray<Real> &u_out, FaceField &b, AthenaArray<Real> &bcc);
   void AddFluxDivergence_STS(const Real wght, int stage,
                              AthenaArray<Real> &u_out,
                              AthenaArray<Real> &fl_div_out,
                              std::vector<int> idx_subset);
   void CalculateFluxes(AthenaArray<Real> &w, FaceField &b,
                        AthenaArray<Real> &bcc, const int order);
+  void FirstOrderFluxes(AthenaArray<Real> &w,FaceField &b, AthenaArray<Real> &bcc, 
+                        int is, int js, int ks, int ie, int je, int ke);
   void CalculateFluxes_STS();
+
 #if !MAGNETIC_FIELDS_ENABLED  // Hydro:
   void RiemannSolver(
       const int k, const int j, const int il, const int iu,

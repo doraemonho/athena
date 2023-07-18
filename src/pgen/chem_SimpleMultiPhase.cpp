@@ -284,9 +284,9 @@ void MeshBlock::UserWorkInLoop() {
           // Check if u_d < d_floor && if v > vmax 
           if (u_d  < d_floor){
             Real u_1,u_2,u_3;
-            u_1 = u_m1/u_d;
-            u_2 = u_m2/u_d;
-            u_3 = u_m3/u_d;
+            u_1 = u_m1/ u_d;
+            u_2 = u_m2/ u_d;
+            u_3 = u_m3/ u_d;
             u_d  = d_floor;
             u_m1 = u_d*u_1;
             u_m2 = u_d*u_2;

@@ -36,7 +36,7 @@
 // (may rename to AddHydroFluxDivergence and AddScalarsFluxDivergence, if
 // the implementations remain completely independent / no inheritance is
 // used)
-void Hydro::AddFluxDivergence(const Real wght, AthenaArray<Real> &u_out) {
+void Hydro::AddFluxDivergence(const Real wght, AthenaArray<Real> &u_out,  FaceField &b,  AthenaArray<Real> &bcc) {
   MeshBlock *pmb = pmy_block;
   AthenaArray<Real> &x1flux = flux[X1DIR];
   AthenaArray<Real> &x2flux = flux[X2DIR];
@@ -46,7 +46,6 @@ void Hydro::AddFluxDivergence(const Real wght, AthenaArray<Real> &u_out) {
   AthenaArray<Real> &x1area = x1face_area_, &x2area = x2face_area_,
                  &x2area_p1 = x2face_area_p1_, &x3area = x3face_area_,
                  &x3area_p1 = x3face_area_p1_, &vol = cell_volume_, &dflx = dflx_;
-
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
       // calculate x1-flux divergence
@@ -82,6 +81,24 @@ void Hydro::AddFluxDivergence(const Real wght, AthenaArray<Real> &u_out) {
         }
       }
 
+      // check if density/pressure are negative and apply the first order flux correction
+      pmb->pcoord->CellVolume(k, j, is, ie, vol);
+#pragma omp simd
+      for (int i=is; i<=ie; ++i) {
+        Real dd = u_out(IDN,k,j,i) - wght*dflx(IDN,i)/vol(i);
+        Real dp = u_out(IPR,k,j,i) - wght*dflx(IEN,i)/vol(i);
+        if ( dd < 0.0 || dp < 0.0 ){
+          FirstOrderFluxes( w, b, bcc, i-1, j-1, k-1, i+1, j+1, k+1);
+          for (int n=0; n<NHYDRO; ++n) {
+            dflx(n,i) = (x1area(i+1)*x1flux(n,k,j,i+1) - x1area(i)*x1flux(n,k,j,i));
+            if (pmb->block_size.nx2 > 1)
+              dflx(n,i) += (x2area_p1(i)*x2flux(n,k,j+1,i) - x2area(i)*x2flux(n,k,j,i));
+            if (pmb->block_size.nx3 > 1)
+              dflx(n,i) += (x3area_p1(i)*x3flux(n,k+1,j,i) - x3area(i)*x3flux(n,k,j,i));
+          }
+        } 
+      }
+
       // update conserved variables
       pmb->pcoord->CellVolume(k, j, is, ie, vol);
       for (int n=0; n<NHYDRO; ++n) {
@@ -92,6 +109,7 @@ void Hydro::AddFluxDivergence(const Real wght, AthenaArray<Real> &u_out) {
       }
     }
   }
+
   return;
 }
 
