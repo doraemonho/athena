@@ -36,7 +36,7 @@
 // (may rename to AddHydroFluxDivergence and AddScalarsFluxDivergence, if
 // the implementations remain completely independent / no inheritance is
 // used)
-void Hydro::AddFluxDivergence(const Real wght, AthenaArray<Real> &u_out,  FaceField &b,  AthenaArray<Real> &bcc) {
+void Hydro::AddFluxDivergence(const Real wght, AthenaArray<Real> &u_out,  FaceField &b,  AthenaArray<Real> &bcc, Real g) {
   MeshBlock *pmb = pmy_block;
   AthenaArray<Real> &x1flux = flux[X1DIR];
   AthenaArray<Real> &x2flux = flux[X2DIR];
@@ -46,6 +46,7 @@ void Hydro::AddFluxDivergence(const Real wght, AthenaArray<Real> &u_out,  FaceFi
   AthenaArray<Real> &x1area = x1face_area_, &x2area = x2face_area_,
                  &x2area_p1 = x2face_area_p1_, &x3area = x3face_area_,
                  &x3area_p1 = x3face_area_p1_, &vol = cell_volume_, &dflx = dflx_;
+
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
       // calculate x1-flux divergence
@@ -85,9 +86,19 @@ void Hydro::AddFluxDivergence(const Real wght, AthenaArray<Real> &u_out,  FaceFi
       pmb->pcoord->CellVolume(k, j, is, ie, vol);
 #pragma omp simd
       for (int i=is; i<=ie; ++i) {
-        Real dd = u_out(IDN,k,j,i) - wght*dflx(IDN,i)/vol(i);
-        Real dp = u_out(IPR,k,j,i) - wght*dflx(IEN,i)/vol(i);
-        if ( dd < 0.0 || dp < 0.0 ){
+        Real u_d = u_out(IDN,k,j,i) - wght*dflx(IDN,i)/vol(i);
+        Real u_e = u_out(IEN,k,j,i) - wght*dflx(IEN,i)/vol(i);
+        Real u_m1 = u_out(IM1,k,j,i) - wght*dflx(IM1,i)/vol(i);
+        Real u_m2 = u_out(IM2,k,j,i) - wght*dflx(IM2,i)/vol(i);
+        Real u_m3 = u_out(IM3,k,j,i) - wght*dflx(IM3,i)/vol(i);
+        Real w_p = (g-1.0)*(u_e - 0.5*(SQR(u_m1) + SQR(u_m2) + SQR(u_m3))/u_d);
+#if MAGNETIC_FIELDS_ENABLED 
+        Real me =0.5*0.25*( SQR(b.x1f(k,j,i) + b.x1f(k,j,i+1))
+                         +  SQR(b.x2f(k,j,i) + b.x2f(k,j+1,i))
+                         +  SQR(b.x3f(k,j,i) + b.x3f(k+1,j,i)));
+        w_p -= (g-1.0)*me;
+#endif
+        if ( u_d < 0.0 || w_p < 0.0 ){
           FirstOrderFluxes( w, b, bcc, i-1, j-1, k-1, i+1, j+1, k+1);
           for (int n=0; n<NHYDRO; ++n) {
             dflx(n,i) = (x1area(i+1)*x1flux(n,k,j,i+1) - x1area(i)*x1flux(n,k,j,i));
