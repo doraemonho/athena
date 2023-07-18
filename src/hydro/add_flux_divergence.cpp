@@ -100,6 +100,12 @@ void Hydro::AddFluxDivergence(const Real wght, AthenaArray<Real> &u_out,  FaceFi
         Real u_m2 = u_out(IM2,k,j,i) - wght*flx_IM2/vol(i);
         Real u_m3 = u_out(IM3,k,j,i) - wght*flx_IM3/vol(i);
         Real w_p = (g-1.0)*(u_e - 0.5*(SQR(u_m1) + SQR(u_m2) + SQR(u_m3))/u_d);
+#if MAGNETIC_FIELDS_ENABLED  // Hydro:
+        Real me =0.5*0.25*( SQR(b.x1f(k,j,i) + b.x1f(k,j,i+1))
+                          + SQR(b.x2f(k,j,i) + b.x2f(k,j+1,i))
+                          + SQR(b.x3f(k,j,i) + b.x3f(k+1,j,i)));
+        w_p -= (g-1.0)*me;
+#endif
         if ( u_d < 0.0 || w_p < 0.0 || std::abs(dflx3D(IEN,k,j,i)/vol(i)*wght)>1e5 || std::abs(dflx3D(IDN,k,j,i)/vol(i)*wght)>1e8 ||
     std::abs(dflx3D(IM1,k,j,i)/vol(i)*wght)>1e5 || std::abs(dflx3D(IM2,k,j,i)/vol(i)*wght)>1e5 || std::abs(dflx3D(IM3,k,j,i)/vol(i)*wght)>1e5     ){
           //std::cout<<"-----------------------------------------------------"<<std::endl;
