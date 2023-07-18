@@ -106,8 +106,10 @@ void Hydro::AddFluxDivergence(const Real wght, AthenaArray<Real> &u_out,  FaceFi
                           + SQR(b.x3f(k,j,i) + b.x3f(k+1,j,i)));
         w_p -= (g-1.0)*me;
 #endif
-        if ( u_d < 0.0 || w_p < 0.0 || std::abs(dflx3D(IEN,k,j,i)/vol(i)*wght)>1e5 || std::abs(dflx3D(IDN,k,j,i)/vol(i)*wght)>1e8 ||
-    std::abs(dflx3D(IM1,k,j,i)/vol(i)*wght)>1e5 || std::abs(dflx3D(IM2,k,j,i)/vol(i)*wght)>1e5 || std::abs(dflx3D(IM3,k,j,i)/vol(i)*wght)>1e5     ){
+        if ( u_d < 0.0 || u_e < 0.0 || 
+          std::abs(dflx3D(IEN,k,j,i)/vol(i)*wght)>1e5 || std::abs(dflx3D(IDN,k,j,i)/vol(i)*wght)>1e8 ||
+          std::abs(dflx3D(IM1,k,j,i)/vol(i)*wght)>1e5 || std::abs(dflx3D(IM2,k,j,i)/vol(i)*wght)>1e5 || 
+          std::abs(dflx3D(IM3,k,j,i)/vol(i)*wght)>1e5     ){
           //std::cout<<"-----------------------------------------------------"<<std::endl;
           //std::cout<<"Enter Flux Correction"<<std::endl;
           //printf("Before : u_d = %e, u_e = %e\n", u_out(IDN,k,j,i), u_out(IEN,k,j,i));
