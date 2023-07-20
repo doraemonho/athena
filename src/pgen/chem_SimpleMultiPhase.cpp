@@ -43,6 +43,7 @@
 #include "../chem_rad/integrators/rad_integrators.hpp"
 #include "../chem_rad/radiation.hpp"
 #include "../scalars/scalars.hpp"
+#include "../fft/turbulence.hpp"
 
 Real CoolingTimeStep(MeshBlock *pmb);
 Real GetChemTime(const Real y[NSPECIES], const Real ydot[NSPECIES],
@@ -56,6 +57,17 @@ namespace {
   Real Tmax;
   int nsub_max;
   int sign(Real number);
+
+  // User defined function for history output
+  Real B2overRho(MeshBlock *pmb, int iout);
+  Real absrho2(MeshBlock *pmb, int iout);
+  Real rhoudota_OU(MeshBlock *pmb, int iout);
+  Real curlU2(MeshBlock *pmb, int iout);
+  Real abspdivV(MeshBlock *pmb, int iout);
+  Real absdivV2(MeshBlock *pmb, int iout);
+  Real absdivV(MeshBlock *pmb, int iout);
+  Real absdivB(MeshBlock *pmb, int iout);
+
 } //namespace
 
 //========================================================================================
@@ -81,6 +93,18 @@ nsub_max = pin->GetOrAddInteger("chemistry","nsub_max",1e5);
 d_floor = pin->GetOrAddInteger("hydro","dfloor",1e-4);
 v_max = pin->GetOrAddInteger("chemistry","v_max",100.0);
 Tmax = pin->GetOrAddInteger("chemistry","Tmax",5e4);
+
+// User defined History Output
+AllocateUserHistoryOutput(8);
+EnrollUserHistoryOutput(0, absdivB,   "<|∇⋅B|>");
+EnrollUserHistoryOutput(1, B2overRho, "<|B2/ρ|>");
+EnrollUserHistoryOutput(2, absrho2,   "<|ρ2|>");
+EnrollUserHistoryOutput(3, absdivV,   "<|∇⋅V|>");
+EnrollUserHistoryOutput(4, absdivV2,  "<|∇⋅V|2>");
+EnrollUserHistoryOutput(5, abspdivV,  "<|p∇⋅V|>");
+EnrollUserHistoryOutput(6, curlU2,    "<|∇XV|2>");
+EnrollUserHistoryOutput(7, rhoudota_OU, "<|ρu⋅a|>");
+
   return;
 }
 
@@ -155,8 +179,6 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
     throw std::runtime_error(msg.str().c_str());
     }
   }
-
-
 
   //intialize radiation field
   if (CHEMRADIATION_ENABLED) {
@@ -294,10 +316,6 @@ void MeshBlock::UserWorkInLoop() {
             u_m3 = u_d*u_3;
           }
 
-          //if ( std::abs(u_m1) >  u_d*v_max) u_m1 =  u_d*sign(u_m1)*v_max; 
-          //if ( std::abs(u_m2) >  u_d*v_max) u_m2 =  u_d*sign(u_m2)*v_max; 
-          //if ( std::abs(u_m3) >  u_d*v_max) u_m3 =  u_d*sign(u_m3)*v_max; 
-
           Real   nH_  = u_d*unit_density_in_nH_;
           Real   ED   = w_p/(g-1.0);
           Real E_ergs = ED * unit_E_in_cgs_ / nH_;
@@ -309,7 +327,6 @@ void MeshBlock::UserWorkInLoop() {
           w_p = (T > Tmax) ?   pmax : w_p;
           Real di = 1.0/u_d;
           Real ke = 0.5*di*(SQR(u_m1) + SQR(u_m2) + SQR(u_m3));
-
             
 #if !MAGNETIC_FIELDS_ENABLED  // Hydro:
           u_e = w_p/(g-1.0)+ke;
@@ -325,9 +342,448 @@ void MeshBlock::UserWorkInLoop() {
   }
   return;
 }
-
+//user defined function for the problem generator
 namespace {
 int sign(Real number) {
   return (number > 0) - (number < 0);
 }
+
+//2. $<\nabla\cdot \vec{v}>$ -> OK
+//3. $<p\nabla\cdot\vec{v}>$ -> OK
+//4. $<|\nabla\cdot\vec{v}|^2>$ -> OK 
+//5. $<|\nabla\times\vec{v}|^2>$  -> OK
+//6. $<|\nabla\cdot\vec{B}|>$  -> OK
+//7. $<\rho u\dot a> = <\rho u\dot dv_OU/dt>$ -> OK
+//8. $<B^2/\rho>$ -> OK
+//9. $<\rho^2>$ -> OK
+
+Real absdivB(MeshBlock *pmb, int iout) {
+
+  Real N = pmb->pmy_mesh->mesh_size.nx1 * pmb->pmy_mesh->mesh_size.nx2 * pmb->pmy_mesh->mesh_size.nx3;
+  int is=pmb->is, ie=pmb->ie, js=pmb->js, je=pmb->je, ks=pmb->ks, ke=pmb->ke;
+  AthenaArray<Real> face1, face2p, face2m, face3p, face3m;
+  FaceField &b = pmb->pfield->b;
+  Real absdivb = 0.0;
+
+  face1.NewAthenaArray( (ie-is)+2*NGHOST+2);
+  face2p.NewAthenaArray((ie-is)+2*NGHOST+1);
+  face2m.NewAthenaArray((ie-is)+2*NGHOST+1);
+  face3p.NewAthenaArray((ie-is)+2*NGHOST+1);
+  face3m.NewAthenaArray((ie-is)+2*NGHOST+1);
+
+  for(int k=ks; k<=ke; k++) {
+    for(int j=js; j<=je; j++) {
+      pmb->pcoord->Face1Area(k,   j,   is, ie+1, face1);
+      pmb->pcoord->Face2Area(k,   j+1, is, ie,   face2p);
+      pmb->pcoord->Face2Area(k,   j,   is, ie,   face2m);
+      pmb->pcoord->Face3Area(k+1, j,   is, ie,   face3p);
+      pmb->pcoord->Face3Area(k,   j,   is, ie,   face3m);
+#pragma omp simd
+      for(int i=is; i<=ie; i++) {
+        absdivb += std::abs((face1(i+1)*b.x1f(k,j,i+1)-face1(i)*b.x1f(k,j,i)
+                            +face2p(i)*b.x2f(k,j+1,i)-face2m(i)*b.x2f(k,j,i)
+                            +face3p(i)*b.x3f(k+1,j,i)-face3m(i)*b.x3f(k,j,i)));
+      }
+    }
+  }
+
+  return absdivb/N;
+}
+
+Real absrho2(MeshBlock *pmb, int iout) {
+  Real N = pmb->pmy_mesh->mesh_size.nx1 * pmb->pmy_mesh->mesh_size.nx2 * pmb->pmy_mesh->mesh_size.nx3;
+  int is=pmb->is, ie=pmb->ie, js=pmb->js, je=pmb->je, ks=pmb->ks, ke=pmb->ke;
+
+  AthenaArray<Real> vol;
+  vol.NewAthenaArray((ie-is)+2*NGHOST+1);
+  Real absrho2 = 0.0;
+
+  for(int k=ks; k<=ke; k++) {
+    for(int j=js; j<=je; j++) {
+    pmb->pcoord->CellVolume(k, j, pmb->is, pmb->ie, vol);
+#pragma omp simd
+      for(int i=is; i<=ie; i++) {
+        absrho2+= vol(i)*pow(pmb->phydro->u(IDN,k,j,i),2);
+      }
+    }
+  }
+
+  return absrho2/N;
+}
+
+Real B2overRho(MeshBlock *pmb, int iout) {
+
+  Real N = pmb->pmy_mesh->mesh_size.nx1 * pmb->pmy_mesh->mesh_size.nx2 * pmb->pmy_mesh->mesh_size.nx3;
+  int is=pmb->is, ie=pmb->ie, js=pmb->js, je=pmb->je, ks=pmb->ks, ke=pmb->ke;
+  FaceField &b = pmb->pfield->b;
+  Real b2overrho = 0.0;
+
+  AthenaArray<Real> vol;
+  vol.NewAthenaArray((ie-is)+2*NGHOST+1);
+
+  for(int k=ks; k<=ke; k++) {
+    for(int j=js; j<=je; j++) {
+    pmb->pcoord->CellVolume(k, j, pmb->is, pmb->ie, vol);
+#pragma omp simd
+      for(int i=is; i<=ie; i++) {          
+        Real b2 = 0.5*( SQR(b.x1f(k,j,i) + b.x1f(k,j,i+1))
+                      + SQR(b.x3f(k,j,i) + b.x3f(k+1,j,i))
+                      + SQR(b.x2f(k,j,i) + b.x2f(k,j+1,i)));
+        b2overrho += vol(i)*b2/pmb->phydro->u(IDN,k,j,i);
+      }
+    }
+  }
+
+  return b2overrho/N;
+}
+
+
+Real absdivV(MeshBlock *pmb, int iout) {
+  Real N = pmb->pmy_mesh->mesh_size.nx1 * pmb->pmy_mesh->mesh_size.nx2 * pmb->pmy_mesh->mesh_size.nx3;
+  int is=pmb->is, ie=pmb->ie, js=pmb->js, je=pmb->je, ks=pmb->ks, ke=pmb->ke;
+  int il = is - 1; int iu = ie + 1;
+  int jl = js - 1; int ju = je + 1;
+  int kl = ks - 1; int ku = ke + 1;
+
+  AthenaArray<Real> &w = pmb->phydro->w;
+  AthenaArray<Real> x1area_, x2area_, x3area_, x2area_p1_, x3area_p1_, vol_;
+
+  x1area_.NewAthenaArray((ie-is)+2*NGHOST+2);
+  x2area_.NewAthenaArray((ie-is)+2*NGHOST+1);
+  x3area_.NewAthenaArray((ie-is)+2*NGHOST+1);
+  x2area_p1_.NewAthenaArray((ie-is)+2*NGHOST+1);
+  x3area_p1_.NewAthenaArray((ie-is)+2*NGHOST+1);
+  vol_.NewAthenaArray((ie-is)+2*NGHOST+1);
+
+  AthenaArray<Real> tmp_div;
+  tmp_div.NewAthenaArray((ie-is)+2*NGHOST+1, (je-js)+2*NGHOST+1, (ke-ks)+2*NGHOST+1);
+  
+  Real area_p1, area;
+  Real vel_p1, vel;
+  Real div_vel = 0.0;
+  
+  for (int k=kl; k<=ku; ++k) {
+    for (int j=jl; j<=ju; ++j) {
+      // calculate x1-flux divergence
+      pmb->pcoord->Face1Area(k, j, il, iu+1, x1area_);
+#pragma omp simd private(area_p1, area, vel_p1, vel)
+      for (int i=il; i<=iu; ++i) {
+        area_p1 = x1area_(i+1);
+        area    = x1area_(i);
+        vel_p1  = 0.5*(w(IVX,k,j,i+1) + w(IVX,k,j,i  ));
+        vel     = 0.5*(w(IVX,k,j,i  ) + w(IVX,k,j,i-1));
+        tmp_div(i,j,k) = area_p1*vel_p1 - area*vel;
+      }
+      // calculate x2-flux divergnece
+      pmb->pcoord->Face2Area(k, j  , il, iu, x2area_);
+      pmb->pcoord->Face2Area(k, j+1, il, iu, x2area_p1_);
+#pragma omp simd private(area_p1, area, vel_p1, vel)
+      for (int i=il; i<=iu; ++i) {
+        area_p1 = x2area_p1_(i);
+        area    = x2area_(i);
+        vel_p1  = 0.5*(w(IVY,k,j+1,i) + w(IVY,k,j  ,i));
+        vel     = 0.5*(w(IVY,k,j  ,i) + w(IVY,k,j-1,i));
+        tmp_div(i,j,k) += area_p1*vel_p1 - area*vel;
+      }
+      pmb->pcoord->Face3Area(k  , j, il, iu, x3area_);
+      pmb->pcoord->Face3Area(k+1, j, il, iu, x3area_p1_);
+#pragma omp simd private(area_p1, area, vel_p1, vel)
+      for (int i=il; i<=iu; ++i) {
+        area_p1 = x3area_p1_(i);
+        area    = x3area_(i);
+        vel_p1  = 0.5*(w(IVZ,k+1,j,i) + w(IVZ, k  ,j,i));
+        vel     = 0.5*(w(IVZ,k  ,j,i) + w(IVZ, k-1,j,i));
+        tmp_div(i,j,k) += area_p1*vel_p1 - area*vel;
+      }
+    }
+  }
+
+  for (int k=kl; k<=ku; ++k) {
+    for (int j=jl; j<=ju; ++j) {
+        pmb->pcoord->CellVolume(k,j,il,iu,vol_);
+#pragma omp simd
+      for (int i=il; i<=iu; ++i) {
+        div_vel += tmp_div(i,j,k)/vol_(i);
+      }
+    }
+  }
+
+  return div_vel/N;
+}
+
+// Computing |div V|^2
+Real absdivV2(MeshBlock *pmb, int iout) {
+  Real N = pmb->pmy_mesh->mesh_size.nx1 * pmb->pmy_mesh->mesh_size.nx2 * pmb->pmy_mesh->mesh_size.nx3;
+  int is=pmb->is, ie=pmb->ie, js=pmb->js, je=pmb->je, ks=pmb->ks, ke=pmb->ke;
+  int il = is - 1; int iu = ie + 1;
+  int jl = js - 1; int ju = je + 1;
+  int kl = ks - 1; int ku = ke + 1;
+
+  AthenaArray<Real> &w = pmb->phydro->w;
+  AthenaArray<Real> x1area_, x2area_, x3area_, x2area_p1_, x3area_p1_, vol_;
+
+  x1area_.NewAthenaArray((ie-is)+2*NGHOST+2);
+  x2area_.NewAthenaArray((ie-is)+2*NGHOST+1);
+  x3area_.NewAthenaArray((ie-is)+2*NGHOST+1);
+  x2area_p1_.NewAthenaArray((ie-is)+2*NGHOST+1);
+  x3area_p1_.NewAthenaArray((ie-is)+2*NGHOST+1);
+  vol_.NewAthenaArray((ie-is)+2*NGHOST+1);
+
+  AthenaArray<Real> tmp_div;
+  tmp_div.NewAthenaArray((ie-is)+2*NGHOST+1, (je-js)+2*NGHOST+1, (ke-ks)+2*NGHOST+1);
+  
+  Real area_p1, area;
+  Real vel_p1, vel;
+  Real div_vel2 = 0.0;
+
+  for (int k=kl; k<=ku; ++k) {
+    for (int j=jl; j<=ju; ++j) {
+      // calculate x1-flux divergence
+      pmb->pcoord->Face1Area(k, j, il, iu+1, x1area_);
+#pragma omp simd private(area_p1, area, vel_p1, vel)
+      for (int i=il; i<=iu; ++i) {
+        area_p1 = x1area_(i+1);
+        area    = x1area_(i);
+        vel_p1  = 0.5*(w(IVX,k,j,i+1) + w(IVX,k,j,i  ));
+        vel     = 0.5*(w(IVX,k,j,i  ) + w(IVX,k,j,i-1));
+        tmp_div(i,j,k) = area_p1*vel_p1 - area*vel;
+      }
+      // calculate x2-flux divergnece
+      pmb->pcoord->Face2Area(k, j  , il, iu, x2area_);
+      pmb->pcoord->Face2Area(k, j+1, il, iu, x2area_p1_);
+#pragma omp simd private(area_p1, area, vel_p1, vel)
+      for (int i=il; i<=iu; ++i) {
+        area_p1 = x2area_p1_(i);
+        area    = x2area_(i);
+        vel_p1  = 0.5*(w(IVY,k,j+1,i) + w(IVY,k,j  ,i));
+        vel     = 0.5*(w(IVY,k,j  ,i) + w(IVY,k,j-1,i));
+        tmp_div(i,j,k) += area_p1*vel_p1 - area*vel;
+      }
+      pmb->pcoord->Face3Area(k  , j, il, iu, x3area_);
+      pmb->pcoord->Face3Area(k+1, j, il, iu, x3area_p1_);
+#pragma omp simd private(area_p1, area, vel_p1, vel)
+      for (int i=il; i<=iu; ++i) {
+        area_p1 = x3area_p1_(i);
+        area    = x3area_(i);
+        vel_p1  = 0.5*(w(IVZ,k+1,j,i) + w(IVZ, k  ,j,i));
+        vel     = 0.5*(w(IVZ,k  ,j,i) + w(IVZ, k-1,j,i));
+        tmp_div(i,j,k) += area_p1*vel_p1 - area*vel;
+      }
+    }
+  }
+
+  for (int k=kl; k<=ku; ++k) {
+    for (int j=jl; j<=ju; ++j) {
+        pmb->pcoord->CellVolume(k,j,il,iu,vol_);
+#pragma omp simd
+      for (int i=il; i<=iu; ++i) {
+        div_vel2 += std::pow(tmp_div(i,j,k),2)/vol_(i);
+      }
+    }
+  }
+
+  return div_vel2/N;
+}
+
+//Computing |p div V|
+Real abspdivV(MeshBlock *pmb, int iout) {
+  Real N = pmb->pmy_mesh->mesh_size.nx1 * pmb->pmy_mesh->mesh_size.nx2 * pmb->pmy_mesh->mesh_size.nx3;
+  int is=pmb->is, ie=pmb->ie, js=pmb->js, je=pmb->je, ks=pmb->ks, ke=pmb->ke;
+  int il = is - 1; int iu = ie + 1;
+  int jl = js - 1; int ju = je + 1;
+  int kl = ks - 1; int ku = ke + 1;
+
+  AthenaArray<Real> &w = pmb->phydro->w;
+  AthenaArray<Real> x1area_, x2area_, x3area_, x2area_p1_, x3area_p1_, vol_;
+
+  x1area_.NewAthenaArray((ie-is)+2*NGHOST+2);
+  x2area_.NewAthenaArray((ie-is)+2*NGHOST+1);
+  x3area_.NewAthenaArray((ie-is)+2*NGHOST+1);
+  x2area_p1_.NewAthenaArray((ie-is)+2*NGHOST+1);
+  x3area_p1_.NewAthenaArray((ie-is)+2*NGHOST+1);
+  vol_.NewAthenaArray((ie-is)+2*NGHOST+1);
+
+  AthenaArray<Real> tmp_div;
+  tmp_div.NewAthenaArray((ie-is)+2*NGHOST+1, (je-js)+2*NGHOST+1, (ke-ks)+2*NGHOST+1);
+  
+  Real area_p1, area;
+  Real vel_p1, vel;
+  Real p_div_vel = 0.0;
+  for (int k=kl; k<=ku; ++k) {
+    for (int j=jl; j<=ju; ++j) {
+      // calculate x1-flux divergence
+      pmb->pcoord->Face1Area(k, j, il, iu+1, x1area_);
+#pragma omp simd private(area_p1, area, vel_p1, vel)
+      for (int i=il; i<=iu; ++i) {
+        area_p1 = x1area_(i+1);
+        area    = x1area_(i);
+        vel_p1  = 0.5*(w(IVX,k,j,i+1) + w(IVX,k,j,i  ));
+        vel     = 0.5*(w(IVX,k,j,i  ) + w(IVX,k,j,i-1));
+        tmp_div(i,j,k) = area_p1*vel_p1 - area*vel;
+      }
+      // calculate x2-flux divergnece
+      pmb->pcoord->Face2Area(k, j  , il, iu, x2area_);
+      pmb->pcoord->Face2Area(k, j+1, il, iu, x2area_p1_);
+#pragma omp simd private(area_p1, area, vel_p1, vel)
+      for (int i=il; i<=iu; ++i) {
+        area_p1 = x2area_p1_(i);
+        area    = x2area_(i);
+        vel_p1  = 0.5*(w(IVY,k,j+1,i) + w(IVY,k,j  ,i));
+        vel     = 0.5*(w(IVY,k,j  ,i) + w(IVY,k,j-1,i));
+        tmp_div(i,j,k) += area_p1*vel_p1 - area*vel;
+      }
+      pmb->pcoord->Face3Area(k  , j, il, iu, x3area_);
+      pmb->pcoord->Face3Area(k+1, j, il, iu, x3area_p1_);
+#pragma omp simd private(area_p1, area, vel_p1, vel)
+      for (int i=il; i<=iu; ++i) {
+        area_p1 = x3area_p1_(i);
+        area    = x3area_(i);
+        vel_p1  = 0.5*(w(IVZ,k+1,j,i) + w(IVZ, k  ,j,i));
+        vel     = 0.5*(w(IVZ,k  ,j,i) + w(IVZ, k-1,j,i));
+        tmp_div(i,j,k) += area_p1*vel_p1 - area*vel;
+      }
+    }
+  }
+  for (int k=kl; k<=ku; ++k) {
+    for (int j=jl; j<=ju; ++j) {
+        pmb->pcoord->CellVolume(k,j,il,iu,vol_);
+#pragma omp simd
+      for (int i=il; i<=iu; ++i) {
+        p_div_vel += w(IPR,k,j,i)*tmp_div(i,j,k)/vol_(i);
+      }
+    }
+  }
+
+  return p_div_vel/N;
+}
+// Computing |Curl U|^2
+Real curlU2(MeshBlock *pmb, int iout) {
+  Real N = pmb->pmy_mesh->mesh_size.nx1 * pmb->pmy_mesh->mesh_size.nx2 * pmb->pmy_mesh->mesh_size.nx3;
+  int is=pmb->is, ie=pmb->ie, js=pmb->js, je=pmb->je, ks=pmb->ks, ke=pmb->ke;
+ 
+  int il = is - 1; int iu = ie + 1;
+  int jl = js - 1; int ju = je + 1;
+  int kl = ks - 1; int ku = ke + 1;
+
+  AthenaArray<Real> &w = pmb->phydro->w;
+  AthenaArray<Real> x1area_, x2area_, x3area_, x2area_p1_, x3area_p1_, vol_;
+
+  x1area_.NewAthenaArray((ie-is)+2*NGHOST+2);
+  x2area_.NewAthenaArray((ie-is)+2*NGHOST+1);
+  x3area_.NewAthenaArray((ie-is)+2*NGHOST+1);
+  x2area_p1_.NewAthenaArray((ie-is)+2*NGHOST+1);
+  x3area_p1_.NewAthenaArray((ie-is)+2*NGHOST+1);
+  vol_.NewAthenaArray((ie-is)+2*NGHOST+1);
+
+  AthenaArray<Real> tmp_curlx1, tmp_curlx2, tmp_curlx3;
+  tmp_curlx1.NewAthenaArray((ie-is)+2*NGHOST+1, (je-js)+2*NGHOST+1, (ke-ks)+2*NGHOST+1);
+  tmp_curlx2.NewAthenaArray((ie-is)+2*NGHOST+1, (je-js)+2*NGHOST+1, (ke-ks)+2*NGHOST+1);
+  tmp_curlx3.NewAthenaArray((ie-is)+2*NGHOST+1, (je-js)+2*NGHOST+1, (ke-ks)+2*NGHOST+1);
+
+  Real area_p1, area;
+  Real vel_p1, vel;
+  Real abs_curl2 = 0.0;
+
+// Update curl
+// x1 dir : d/dx2 (v3) - d/dx3 (v2)
+// x2 dir : d/dx3 (v1) - d/dx1 (v3)
+// x3 dir : d/dx1 (v2) - d/dx2 (v1)
+  for (int k=kl; k<=ku; ++k) {
+    for (int j=jl; j<=ju; ++j) {
+      // x1->x3 face :   d/dx1 (v2)
+      // x1->x2 face : - d/dx1 (v3)
+      pmb->pcoord->Face1Area(k, j, il, iu+1, x1area_);
+#pragma omp simd private(area_p1, area, vel_p1, vel)
+      for (int i=il; i<=iu; ++i) {
+        area_p1 = x1area_(i+1);
+        area    = x1area_(i);
+        vel_p1  = 0.5*(w(IVY,k,j,i+1) + w(IVY,k,j,i  ));
+        vel     = 0.5*(w(IVY,k,j,i  ) + w(IVY,k,j,i-1));
+        tmp_curlx3(i,j,k) += area_p1*vel_p1 - area*vel;
+    
+        vel_p1  = 0.5*(w(IVZ,k,j,i+1) + w(IVZ,k,j,i  ));
+        vel     = 0.5*(w(IVZ,k,j,i  ) + w(IVZ,k,j,i-1));
+        tmp_curlx2(i,j,k) -= (area_p1*vel_p1 - area*vel);
+      }
+
+      pmb->pcoord->Face2Area(k, j  , il, iu, x2area_);
+      pmb->pcoord->Face2Area(k, j+1, il, iu, x2area_p1_);
+#pragma omp simd private(area_p1, area, vel_p1, vel)
+      for (int i=il; i<=iu; ++i) {
+        // x2->x1 dir :    d/dx2 (v3)
+        // x2->x3 dir :  - d/dx2 (v1)
+        area_p1 = x2area_p1_(i);
+        area    = x2area_(i);
+        vel_p1  = 0.5*(w(IVZ,k,j+1,i) + w(IVZ,k,j  ,i));
+        vel     = 0.5*(w(IVZ,k,j  ,i) + w(IVZ,k,j-1,i));
+        tmp_curlx1(i,j,k) += area_p1*vel_p1 - area*vel;
+
+        vel_p1  = 0.5*(w(IVX,k,j+1,i) + w(IVX,k,j  ,i));
+        vel     = 0.5*(w(IVX,k,j  ,i) + w(IVX,k,j-1,i));
+        tmp_curlx3(i,j,k) -= area_p1*vel_p1 - area*vel;
+      }
+      pmb->pcoord->Face3Area(k  , j, il, iu, x3area_);
+      pmb->pcoord->Face3Area(k+1, j, il, iu, x3area_p1_);
+#pragma omp simd private(area_p1, area, vel_p1, vel)
+      for (int i=il; i<=iu; ++i) {
+        // x1 dir : - d/dx3 (v2)
+        // x2 dir :   d/dx3 (v1)
+        area_p1 = x3area_p1_(i);
+        area    = x3area_(i);
+        vel_p1  = 0.5*(w(IVY,k+1,j,i) + w(IVY, k  ,j,i));
+        vel     = 0.5*(w(IVY,k  ,j,i) + w(IVY, k-1,j,i));
+        tmp_curlx1(i,j,k) -= area_p1*vel_p1 - area*vel;
+
+        vel_p1  = 0.5*(w(IVX,k+1,j,i) + w(IVX, k  ,j,i));
+        vel     = 0.5*(w(IVX,k  ,j,i) + w(IVX, k-1,j,i));
+        tmp_curlx2(i,j,k) += area_p1*vel_p1 - area*vel;
+      }
+      pmb->pcoord->CellVolume(k,j,il,iu,vol_);
+#pragma omp simd
+      for (int i=il; i<=iu; ++i) {
+        Real curl2 = tmp_curlx1(i,j,k)*tmp_curlx1(i,j,k) + 
+                     tmp_curlx2(i,j,k)*tmp_curlx2(i,j,k) + 
+                     tmp_curlx3(i,j,k)*tmp_curlx3(i,j,k);
+        abs_curl2 += curl2/vol_(i);
+      }
+    }
+  }
+  return abs_curl2/N;
+}
+
+//7. $<\rho u\dot a> = <\rho u\dot dv_OU/dt>$ 
+Real rhoudota_OU(MeshBlock *pmb, int iout) {
+  Real N = pmb->pmy_mesh->mesh_size.nx1 * pmb->pmy_mesh->mesh_size.nx2 * pmb->pmy_mesh->mesh_size.nx3;
+  int is=pmb->is, ie=pmb->ie, js=pmb->js, je=pmb->je, ks=pmb->ks, ke=pmb->ke;
+
+  Real rho_u_dot_aOU = 0.0;
+  Real dt = pmb->pmy_mesh->dt;
+  Mesh *pmesh = pmb->pmy_mesh;
+  TurbulenceDriver *ptrbd = pmesh->ptrbd;
+  AthenaArray<Real> &dv1 = ptrbd->vel[0], &dv2 = ptrbd->vel[1], &dv3 = ptrbd->vel[2];
+  
+  AthenaArray<Real> vol;
+  vol.NewAthenaArray((ie-is)+2*NGHOST+1);
+
+  for (int nb=0; nb<pmesh->nblocal; ++nb) {
+    for(int k=ks; k<=ke; k++) {
+      for(int j=js; j<=je; j++) {
+        pmb->pcoord->CellVolume(k, j, pmb->is, pmb->ie, vol);  
+#pragma omp simd
+        for(int i=is; i<=ie; i++) {
+          Real rho = pmb->phydro->u(IDN,k,j,i);
+          Real  ux = pmb->phydro->u(IVX,k,j,i);
+          Real  uy = pmb->phydro->u(IVY,k,j,i);
+          Real  uz = pmb->phydro->u(IVZ,k,j,i);
+          Real dvx = dv1(nb,k,j,i);
+          Real dvy = dv2(nb,k,j,i);
+          Real dvz = dv3(nb,k,j,i);
+          rho_u_dot_aOU += vol(i)*rho*(ux*dvx + uy*dvy + uz*dvz);
+        }
+      }
+    }
+  }
+  return rho_u_dot_aOU/dt/N;
+}
+
 } //namespace

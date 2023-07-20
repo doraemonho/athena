@@ -41,9 +41,10 @@ void Hydro::AddFluxDivergence(const Real wght, AthenaArray<Real> &u_out,  FaceFi
   AthenaArray<Real> &x1flux = flux[X1DIR];
   AthenaArray<Real> &x2flux = flux[X2DIR];
   AthenaArray<Real> &x3flux = flux[X3DIR];
+
   int is = pmb->is; int js = pmb->js; int ks = pmb->ks;
   int ie = pmb->ie; int je = pmb->je; int ke = pmb->ke;
-  const Real flx_max = 1e5;
+  const Real flx_max = 1e20;
   AthenaArray<Real> &x1area = x1face_area_, &x2area = x2face_area_,
                  &x2area_p1 = x2face_area_p1_, &x3area = x3face_area_,
                  &x3area_p1 = x3face_area_p1_, &vol = cell_volume_, &dflx3D = dflx3D_;
@@ -84,41 +85,30 @@ void Hydro::AddFluxDivergence(const Real wght, AthenaArray<Real> &u_out,  FaceFi
     }
   }
 
-// first order flux correction
+// first order flux correction (K. W. HO @UW-Madison/LANL, 19 Jul 2023)
 // not a good one but it works
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
-      // check if density/pressure are negative and apply the first order flux correction
+      // check if density flux is too huge and apply the first order flux correction
+      // Caution : any first-flux correction would causing injection of net momentum in the system
       pmb->pcoord->CellVolume(k, j, is, ie, vol);
       for (int i=is; i<=ie; ++i) {
         Real &flx_IDN = dflx3D(IDN,k,j,i);
-        Real &flx_IEN = dflx3D(IEN,k,j,i);
-        
         Real u_d  = u_out(IDN,k,j,i) - wght*flx_IDN/vol(i);
-        Real u_e  = u_out(IEN,k,j,i) - wght*flx_IEN/vol(i);
+          
+        if (std::abs(dflx3D(IDN,k,j,i)/vol(i)*wght)>flx_max){
+          FirstOrderFluxes( w, b, bcc, i, j, k, i+1, j+1, k+1);
 
-        if ( u_d < 0.0 || u_e < 0.0 || 
-            std::abs(dflx3D(IEN,k,j,i)/vol(i)*wght)>1e5 || std::abs(dflx3D(IDN,k,j,i)/vol(i)*wght)>1e8 ||
-            std::abs(dflx3D(IM1,k,j,i)/vol(i)*wght)>1e5 || std::abs(dflx3D(IM2,k,j,i)/vol(i)*wght)>1e5 || 
-            std::abs(dflx3D(IM3,k,j,i)/vol(i)*wght)>1e5){
-          FirstOrderFluxes( w, b, bcc, i-1, j-1, k-1, i+1, j+1, k+1);
-
-          for (int kk=k-1; kk<=k+1; ++kk) {
-            for (int jj=j-1; jj<=j+1; ++jj) {
-              //Apply the flux correction to the near pixels
-              pmb->pcoord->Face1Area(kk, jj, is, ie+1, x1area);
-              pmb->pcoord->Face2Area(kk, jj  , is, ie, x2area   );
-              pmb->pcoord->Face2Area(kk, jj+1, is, ie, x2area_p1);
-              pmb->pcoord->Face3Area(kk  , jj, is, ie, x3area   );
-              pmb->pcoord->Face3Area(kk+1, jj, is, ie, x3area_p1);
-              for (int ii=i-1; ii<=i+1; ++ii) {
-                for (int n=0; n<NHYDRO; ++n) {
-                  dflx3D(n,kk,jj,ii)  = (x1area(ii+1) *x1flux(n,kk,jj,ii+1) - x1area(ii)*x1flux(n,kk,jj,ii));
-                  dflx3D(n,kk,jj,ii) += (x2area_p1(ii)*x2flux(n,kk,jj+1,ii) - x2area(ii)*x2flux(n,kk,jj,ii));
-                  dflx3D(n,kk,jj,ii) += (x3area_p1(ii)*x3flux(n,kk+1,jj,ii) - x3area(ii)*x3flux(n,kk,jj,ii));
-                }
-              }
-            }
+          //Apply the flux correction to the pixel
+          pmb->pcoord->Face1Area(k, j, is, ie+1, x1area);
+          pmb->pcoord->Face2Area(k, j  , is, ie, x2area   );
+          pmb->pcoord->Face2Area(k, j+1, is, ie, x2area_p1);
+          pmb->pcoord->Face3Area(k  , j, is, ie, x3area   );
+          pmb->pcoord->Face3Area(k+1, j, is, ie, x3area_p1);
+          for (int n=0; n<NHYDRO; ++n) {
+            dflx3D(n,k,j,i)  = (x1area(i+1) *x1flux(n,k,j,i+1) - x1area(i)*x1flux(n,k,j,i));
+            dflx3D(n,k,j,i) += (x2area_p1(i)*x2flux(n,k,j+1,i) - x2area(i)*x2flux(n,k,j,i));
+            dflx3D(n,k,j,i) += (x3area_p1(i)*x3flux(n,k+1,j,i) - x3area(i)*x3flux(n,k,j,i));
           }
         }
       }
@@ -134,11 +124,7 @@ void Hydro::AddFluxDivergence(const Real wght, AthenaArray<Real> &u_out,  FaceFi
         for (int i=is; i<=ie; ++i) {
           u_out(n,k,j,i) -= wght*dflx3D(n,k,j,i)/vol(i); 
         }
-      }    
-      for (int i=is; i<=ie; ++i) {
-        if ( u_out(IDN,k,j,i) < 0 || u_out(IEN,k,j,i) < 0 || std::abs(dflx3D(IEN,k,j,i)/vol(i)*wght)>flx_max || std::abs(dflx3D(IDN,k,j,i)/vol(i)*wght)>flx_max )
-          printf("!!!!!!!!!!!Warning : u_d = %e, u_e = %e\n", u_out(IDN,k,j,i), u_out(IEN,k,j,i));
-      }
+      } 
     }
   }
 

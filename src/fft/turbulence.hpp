@@ -42,12 +42,13 @@ class TurbulenceDriver : public FFTDriver{
   void Project(std::complex<Real> **fv, std::complex<Real> **fv_sh,
                std::complex<Real> **fv_co);
   std::int64_t GetKcomp(int idx, int disp, int Nx);
+  AthenaArray<Real> vel[3];
  private:
   std::int64_t rseed;
   int nlow, nhigh;
   Real tdrive, dtdrive, tcorr, f_shear;
   Real expo, dedt, dvol;
-  AthenaArray<Real> vel[3];
+
   std::complex<Real> **fv_, **fv_new_;
   std::complex<Real> **fv_sh_, **fv_co_;
   bool initialized_ = false;
