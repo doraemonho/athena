@@ -67,6 +67,8 @@ namespace {
   Real absdivV2(MeshBlock *pmb, int iout);
   Real absdivV(MeshBlock *pmb, int iout);
   Real absdivB(MeshBlock *pmb, int iout);
+  Real Ms2(MeshBlock *pmb, int iout);
+  Real Ma2(MeshBlock *pmb, int iout);
 
 } //namespace
 
@@ -104,6 +106,8 @@ EnrollUserHistoryOutput(4, absdivV2,  "<|∇⋅V|2>");
 EnrollUserHistoryOutput(5, abspdivV,  "<|p∇⋅V|>");
 EnrollUserHistoryOutput(6, curlU2,    "<|∇XV|2>");
 EnrollUserHistoryOutput(7, rhoudota_OU, "<|ρu⋅a|>");
+EnrollUserHistoryOutput(8, Ms2,    "Ms^2");
+EnrollUserHistoryOutput(9, Ma2,    "Ma^2");
 
   return;
 }
@@ -403,7 +407,7 @@ Real absrho2(MeshBlock *pmb, int iout) {
     pmb->pcoord->CellVolume(k, j, pmb->is, pmb->ie, vol);
 #pragma omp simd
       for(int i=is; i<=ie; i++) {
-        absrho2+= vol(i)*pow(pmb->phydro->u(IDN,k,j,i),2);
+        absrho2+= pow(pmb->phydro->u(IDN,k,j,i),2);
       }
     }
   }
@@ -429,7 +433,7 @@ Real B2overRho(MeshBlock *pmb, int iout) {
         Real b2 = 0.5*( SQR(b.x1f(k,j,i) + b.x1f(k,j,i+1))
                       + SQR(b.x3f(k,j,i) + b.x3f(k+1,j,i))
                       + SQR(b.x2f(k,j,i) + b.x2f(k,j+1,i)));
-        b2overrho += vol(i)*b2/pmb->phydro->u(IDN,k,j,i);
+        b2overrho += b2/pmb->phydro->u(IDN,k,j,i);
       }
     }
   }
@@ -778,12 +782,77 @@ Real rhoudota_OU(MeshBlock *pmb, int iout) {
           Real dvx = dv1(nb,k,j,i);
           Real dvy = dv2(nb,k,j,i);
           Real dvz = dv3(nb,k,j,i);
-          rho_u_dot_aOU += vol(i)*rho*(ux*dvx + uy*dvy + uz*dvz);
+          rho_u_dot_aOU += rho*(ux*dvx + uy*dvy + uz*dvz);
         }
       }
     }
   }
   return rho_u_dot_aOU/dt/N;
 }
+
+
+
+//7. Ms^2 = <u^2/cs^2>
+Real Ms2(MeshBlock *pmb, int iout) {
+  Real N = pmb->pmy_mesh->mesh_size.nx1 * pmb->pmy_mesh->mesh_size.nx2 * pmb->pmy_mesh->mesh_size.nx3;
+  int is=pmb->is, ie=pmb->ie, js=pmb->js, je=pmb->je, ks=pmb->ks, ke=pmb->ke;
+
+  Real Ms2 = 0.0;
+  const Real  g =  pmb->peos->GetGamma();
+
+  for(int k=ks; k<=ke; k++) {
+    for(int j=js; j<=je; j++) {
+#pragma omp simd
+      for(int i=is; i<=ie; i++) {
+        Real   p = pmb->phydro->w(IPR,k,j,i);   
+        Real  ux = pmb->phydro->u(IVX,k,j,i);
+        Real  uy = pmb->phydro->u(IVY,k,j,i);
+        Real  uz = pmb->phydro->u(IVZ,k,j,i);
+        Real rho = pmb->phydro->u(IDN,k,j,i);
+
+        Real cs2 = g*p/rho;
+        Real u2  = ux*ux + uy*uy + uz*uz;
+        Ms2 += u2/cs2;
+      }
+    }
+  }
+  
+  return Ms2/N;
+}
+
+
+//8. Ma^2 = <u^2/va^2>, va2 = B^2/rho
+Real Ma2(MeshBlock *pmb, int iout) {
+  Real N = pmb->pmy_mesh->mesh_size.nx1 * pmb->pmy_mesh->mesh_size.nx2 * pmb->pmy_mesh->mesh_size.nx3;
+  int is=pmb->is, ie=pmb->ie, js=pmb->js, je=pmb->je, ks=pmb->ks, ke=pmb->ke;
+
+  Real Ma2 = 0.0;
+
+  FaceField &b = pmb->pfield->b;
+
+  for(int k=ks; k<=ke; k++) {
+    for(int j=js; j<=je; j++) {
+#pragma omp simd
+      for(int i=is; i<=ie; i++) { 
+        Real  ux = pmb->phydro->u(IVX,k,j,i);
+        Real  uy = pmb->phydro->u(IVY,k,j,i);
+        Real  uz = pmb->phydro->u(IVZ,k,j,i);
+        Real rho = pmb->phydro->u(IDN,k,j,i);
+
+        Real b2 = 0.5*( SQR(b.x1f(k,j,i) + b.x1f(k,j,i+1))
+                      + SQR(b.x3f(k,j,i) + b.x3f(k+1,j,i))
+                      + SQR(b.x2f(k,j,i) + b.x2f(k,j+1,i)));
+
+        Real va2 = b2/rho;
+        Real u2  = ux*ux + uy*uy + uz*uz;
+        Ma2 += u2/va2;
+      }
+    }
+  }
+  
+  return Ma2/N;
+}
+
+
 
 } //namespace
