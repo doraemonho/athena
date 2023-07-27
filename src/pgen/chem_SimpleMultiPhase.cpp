@@ -97,7 +97,7 @@ v_max = pin->GetOrAddInteger("chemistry","v_max",100.0);
 Tmax = pin->GetOrAddInteger("chemistry","Tmax",5e4);
 
 // User defined History Output
-AllocateUserHistoryOutput(8);
+AllocateUserHistoryOutput(10);
 EnrollUserHistoryOutput(0, absdivB,   "<|∇⋅B|>");
 EnrollUserHistoryOutput(1, B2overRho, "<|B2/ρ|>");
 EnrollUserHistoryOutput(2, absrho2,   "<|ρ2|>");
