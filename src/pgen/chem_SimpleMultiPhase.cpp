@@ -805,10 +805,10 @@ Real Ms2(MeshBlock *pmb, int iout) {
 #pragma omp simd
       for(int i=is; i<=ie; i++) {
         Real   p = pmb->phydro->w(IPR,k,j,i);   
-        Real  ux = pmb->phydro->u(IVX,k,j,i);
-        Real  uy = pmb->phydro->u(IVY,k,j,i);
-        Real  uz = pmb->phydro->u(IVZ,k,j,i);
-        Real rho = pmb->phydro->u(IDN,k,j,i);
+        Real  ux = pmb->phydro->w(IVX,k,j,i);
+        Real  uy = pmb->phydro->w(IVY,k,j,i);
+        Real  uz = pmb->phydro->w(IVZ,k,j,i);
+        Real rho = pmb->phydro->w(IDN,k,j,i);
 
         Real cs2 = g*p/rho;
         Real u2  = ux*ux + uy*uy + uz*uz;
@@ -834,10 +834,10 @@ Real Ma2(MeshBlock *pmb, int iout) {
     for(int j=js; j<=je; j++) {
 #pragma omp simd
       for(int i=is; i<=ie; i++) { 
-        Real  ux = pmb->phydro->u(IVX,k,j,i);
-        Real  uy = pmb->phydro->u(IVY,k,j,i);
-        Real  uz = pmb->phydro->u(IVZ,k,j,i);
-        Real rho = pmb->phydro->u(IDN,k,j,i);
+        Real  ux = pmb->phydro->w(IVX,k,j,i);
+        Real  uy = pmb->phydro->w(IVY,k,j,i);
+        Real  uz = pmb->phydro->w(IVZ,k,j,i);
+        Real rho = pmb->phydro->w(IDN,k,j,i);
 
         Real b2 = 0.5*( SQR(b.x1f(k,j,i) + b.x1f(k,j,i+1))
                       + SQR(b.x3f(k,j,i) + b.x3f(k+1,j,i))
