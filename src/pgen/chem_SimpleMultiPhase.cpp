@@ -430,9 +430,9 @@ Real B2overRho(MeshBlock *pmb, int iout) {
     pmb->pcoord->CellVolume(k, j, pmb->is, pmb->ie, vol);
 #pragma omp simd
       for(int i=is; i<=ie; i++) {          
-        Real b2 = 0.5*( SQR(b.x1f(k,j,i) + b.x1f(k,j,i+1))
-                      + SQR(b.x3f(k,j,i) + b.x3f(k+1,j,i))
-                      + SQR(b.x2f(k,j,i) + b.x2f(k,j+1,i)));
+        Real b2 = 0.25*( SQR(b.x1f(k,j,i) + b.x1f(k,j,i+1))
+                       + SQR(b.x3f(k,j,i) + b.x3f(k+1,j,i))
+                       + SQR(b.x2f(k,j,i) + b.x2f(k,j+1,i)));
         b2overrho += b2/pmb->phydro->u(IDN,k,j,i);
       }
     }
@@ -839,9 +839,9 @@ Real Ma2(MeshBlock *pmb, int iout) {
         Real  uz = pmb->phydro->w(IVZ,k,j,i);
         Real rho = pmb->phydro->w(IDN,k,j,i);
 
-        Real b2 = 0.5*( SQR(b.x1f(k,j,i) + b.x1f(k,j,i+1))
-                      + SQR(b.x3f(k,j,i) + b.x3f(k+1,j,i))
-                      + SQR(b.x2f(k,j,i) + b.x2f(k,j+1,i)));
+        Real b2 = 0.25*( SQR(b.x1f(k,j,i) + b.x1f(k,j,i+1))
+                       + SQR(b.x3f(k,j,i) + b.x3f(k+1,j,i))
+                       + SQR(b.x2f(k,j,i) + b.x2f(k,j+1,i)));
 
         Real va2 = b2/rho;
         Real u2  = ux*ux + uy*uy + uz*uz;
