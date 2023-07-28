@@ -776,9 +776,9 @@ Real rhoudota_OU(MeshBlock *pmb, int iout) {
 #pragma omp simd
         for(int i=is; i<=ie; i++) {
           Real rho = pmb->phydro->u(IDN,k,j,i);
-          Real  ux = pmb->phydro->u(IVX,k,j,i);
-          Real  uy = pmb->phydro->u(IVY,k,j,i);
-          Real  uz = pmb->phydro->u(IVZ,k,j,i);
+          Real  ux = pmb->phydro->w(IVX,k,j,i);
+          Real  uy = pmb->phydro->w(IVY,k,j,i);
+          Real  uz = pmb->phydro->w(IVZ,k,j,i);
           Real dvx = dv1(nb,k,j,i);
           Real dvy = dv2(nb,k,j,i);
           Real dvz = dv3(nb,k,j,i);
