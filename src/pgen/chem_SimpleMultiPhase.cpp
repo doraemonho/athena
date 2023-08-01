@@ -69,7 +69,7 @@ namespace {
   Real absdivB(MeshBlock *pmb, int iout);
   Real Ms2(MeshBlock *pmb, int iout);
   Real Ma2(MeshBlock *pmb, int iout);
-
+  Real u2(MeshBlock *pmb, int iout);
 } //namespace
 
 //========================================================================================
@@ -97,7 +97,7 @@ v_max = pin->GetOrAddInteger("chemistry","v_max",100.0);
 Tmax = pin->GetOrAddInteger("chemistry","Tmax",5e4);
 
 // User defined History Output
-AllocateUserHistoryOutput(10);
+AllocateUserHistoryOutput(11);
 EnrollUserHistoryOutput(0, absdivB,   "<|∇⋅B|>");
 EnrollUserHistoryOutput(1, B2overRho, "<|B2/ρ|>");
 EnrollUserHistoryOutput(2, absrho2,   "<|ρ2|>");
@@ -108,6 +108,7 @@ EnrollUserHistoryOutput(6, curlU2,    "<|∇XV|2>");
 EnrollUserHistoryOutput(7, rhoudota_OU, "<|ρu⋅a|>");
 EnrollUserHistoryOutput(8, Ms2,    "Ms^2");
 EnrollUserHistoryOutput(9, Ma2,    "Ma^2");
+EnrollUserHistoryOutput(10, u2,    "u^2");
 
   return;
 }
@@ -775,7 +776,7 @@ Real rhoudota_OU(MeshBlock *pmb, int iout) {
         pmb->pcoord->CellVolume(k, j, pmb->is, pmb->ie, vol);  
 #pragma omp simd
         for(int i=is; i<=ie; i++) {
-          Real rho = pmb->phydro->u(IDN,k,j,i);
+          Real rho = pmb->phydro->w(IDN,k,j,i);
           Real  ux = pmb->phydro->w(IVX,k,j,i);
           Real  uy = pmb->phydro->w(IVY,k,j,i);
           Real  uz = pmb->phydro->w(IVZ,k,j,i);
@@ -851,6 +852,29 @@ Real Ma2(MeshBlock *pmb, int iout) {
   }
   
   return Ma2/N;
+}
+
+//9. u2 = <u^2>
+Real u2(MeshBlock *pmb, int iout) {
+  Real N = pmb->pmy_mesh->mesh_size.nx1 * pmb->pmy_mesh->mesh_size.nx2 * pmb->pmy_mesh->mesh_size.nx3;
+  int is=pmb->is, ie=pmb->ie, js=pmb->js, je=pmb->je, ks=pmb->ks, ke=pmb->ke;
+
+  Real u2 = 0.0;
+
+  for(int k=ks; k<=ke; k++) {
+    for(int j=js; j<=je; j++) {
+#pragma omp simd
+      for(int i=is; i<=ie; i++) { 
+        Real  ux = pmb->phydro->w(IVX,k,j,i);
+        Real  uy = pmb->phydro->w(IVY,k,j,i);
+        Real  uz = pmb->phydro->w(IVZ,k,j,i);
+
+        u2  += ux*ux + uy*uy + uz*uz;
+      }
+    }
+  }
+  
+  return u2/N;
 }
 
 
