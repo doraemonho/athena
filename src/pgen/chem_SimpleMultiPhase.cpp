@@ -97,6 +97,17 @@ v_max = pin->GetOrAddInteger("chemistry","v_max",100.0);
 Tmax = pin->GetOrAddInteger("chemistry","Tmax",5e4);
 
 // User defined History Output
+#if !MAGNETIC_FIELDS_ENABLED  // Hydro:
+AllocateUserHistoryOutput(8);
+EnrollUserHistoryOutput(0, absrho2,   "<|ρ2|>");
+EnrollUserHistoryOutput(1, absdivV,   "<|∇⋅V|>");
+EnrollUserHistoryOutput(2, absdivV2,  "<|∇⋅V|2>");
+EnrollUserHistoryOutput(3, abspdivV,  "<|p∇⋅V|>");
+EnrollUserHistoryOutput(4, curlU2,    "<|∇XV|2>");
+EnrollUserHistoryOutput(5, rhoudota_OU, "<|ρu⋅a|>");
+EnrollUserHistoryOutput(6, Ms2,    "Ms^2");
+EnrollUserHistoryOutput(7, u2,    "u^2");
+#else  // MHD:
 AllocateUserHistoryOutput(11);
 EnrollUserHistoryOutput(0, absdivB,   "<|∇⋅B|>");
 EnrollUserHistoryOutput(1, B2overRho, "<|B2/ρ|>");
@@ -109,6 +120,7 @@ EnrollUserHistoryOutput(7, rhoudota_OU, "<|ρu⋅a|>");
 EnrollUserHistoryOutput(8, Ms2,    "Ms^2");
 EnrollUserHistoryOutput(9, Ma2,    "Ma^2");
 EnrollUserHistoryOutput(10, u2,    "u^2");
+#endif
 
   return;
 }

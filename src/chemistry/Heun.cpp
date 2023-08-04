@@ -180,14 +180,8 @@ void ODEWrapper::Integrate(const Real tinit, const Real dt) {
             for (int ispec=0; ispec<=NSPECIES; ispec++)
               y[ispec] = y1[ispec] = y0[ispec];
             E = E1 = E0;
-            std::cout << "### Warning: the chemistry ODE solver is not converging"
-              << std::endl << " Retry with a smaller CFL number: " << cfl_cool_sub0
-              << std::endl;
           }
 
-
-          if (icount == nsub_max - 1)
-          PrintChemTime(y, ydot0, E, Edot0);
           //check maximum number of steps
           if (icount > nsub_max && !retry_flag) {
             std::stringstream msg;
