@@ -366,15 +366,15 @@ if (Globals::my_rank == 0) {
     }
   }
 
-  Real tinit = 0.0;
-  Real dt = 100.0;
-  // evole the chemistry and energy to steady state
-  pscalars->odew.Initialize(pin);
-  pscalars->odew.Integrate(tinit, dt);
-  // sync. the primitive varibles
-  peos->ConservedToPrimitive(phydro->u, phydro->w, pfield->b,
-                             phydro->w, pfield->bcc,
-                             pcoord, is, ie, js, je, ks, ke); 
+  //Real tinit = 0.0;
+  //Real dt = 100.0;
+  //// evole the chemistry and energy to steady state
+  //pscalars->odew.Initialize(pin);
+  //pscalars->odew.Integrate(tinit, dt);
+  //// sync. the primitive varibles
+  //peos->ConservedToPrimitive(phydro->u, phydro->w, pfield->b,
+  //                           phydro->w, pfield->bcc,
+  //                           pcoord, is, ie, js, je, ks, ke); 
 
   return;
 }
