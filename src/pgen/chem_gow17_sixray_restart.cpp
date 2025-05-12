@@ -41,7 +41,7 @@
 #include "../mesh/mesh.hpp"
 #include "../parameter_input.hpp"
 #include "../chem_rad/integrators/rad_integrators.hpp"
-#include "../chem_rad/radiation.hpp"
+#include "../chem_rad/chem_rad.hpp"
 #include "../scalars/scalars.hpp"
 #include "../inputs/hdf5_reader.hpp"
 #include "../outputs/io_wrapper.hpp"
