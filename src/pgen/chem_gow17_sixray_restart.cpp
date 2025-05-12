@@ -109,7 +109,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     EnrollUserBoundaryFunction(BoundaryFace::outer_x3, SixRayBoundaryOuterX3);
   }
 
-
   G0 = pin->GetOrAddReal("chem_radiation", "G0", 0.);
   G0_iang.NewAthenaArray(6);
   G0_iang(BoundaryFace::inner_x1) = pin->GetOrAddReal("chem_radiation","G0_inner_x1",G0);
@@ -283,8 +282,9 @@ if (Globals::my_rank == 0) {
   printf("Process 0: Finished All Reading.\n");
 }
 #endif
-  //intialize radiation field
+  // intialize radiation field
   if (CHEMRADIATION_ENABLED) {
+    const Real cr_rate = pin->GetOrAddReal("chem_radiation", "CR", 2e-16);
     for (int k=ks; k<=ke; ++k) {
       for (int j=js; j<=je; ++j) {
         for (int i=is; i<=ie; ++i) {
@@ -293,20 +293,19 @@ if (Globals::my_rank == 0) {
               pchemrad->ir(k, j, i, ifreq * pchemrad->nang + iang) = G0_iang(iang);
             }
           }
-#ifdef INCLUDE_CHEMISTRY
-          for (int iang=0; iang < pchemrad->nang; ++iang) {
-            //cr rate
-            pchemrad->ir(k, j, i,
-                pscalars->chemnet.index_cr_ * pchemrad->nang + iang) = cr_rate;
+          if (CHEMISTRY_ENABLED) {
+            for (int iang=0; iang < pchemrad->nang; ++iang) {
+              // cr rate
+              pchemrad->ir(k, j, i,
+                  pscalars->chemnet.index_cr_ * pchemrad->nang + iang) = cr_rate;
+            }
           }
-#endif
         }
       }
     }
-    //calculate the average radiation field for output of the initial condition
+    // calculate the average radiation field for output of the initial condition
     pchemrad->pchemradintegrator->CopyToOutput();
   }
-
   //intialize chemical species
   if (NSPECIES > 0) {
     // inital abundance by existing file
